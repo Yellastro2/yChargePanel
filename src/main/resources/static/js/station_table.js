@@ -9,10 +9,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = document.createElement('tr');
                 row.setAttribute('data-index', index);
 
-//                const idCell = document.createElement('td');
-//                idCell.textContent = station.id;
-//                row.appendChild(idCell);
-
                 const stIdCell = document.createElement('td');
                 stIdCell.textContent = station.stId;
                 row.appendChild(stIdCell);
@@ -27,7 +23,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const timestampCell = document.createElement('td');
                 const date = new Date(station.timestamp * 1000);
-                // преобразуем таймстамп в миллисекунды
                 const formattedDate = date.toLocaleString('ru-RU', {
                     day: '2-digit',
                     month: '2-digit',
@@ -37,6 +32,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 timestampCell.textContent = formattedDate;
                 row.appendChild(timestampCell);
+
+                if (station.trafficLastDay && station.trafficLastDay != "{}") {
+                    const trafficData = JSON.parse(station.trafficLastDay);
+
+                    const lteTotal = (trafficData.mobile_send + trafficData.mobile_received) / 1024;
+                    const uidTotal = (trafficData.uid_send + trafficData.uid_received) / 1024;
+                    const overallTotal = (trafficData.total_send + trafficData.total_received) / 1024;
+
+                    const trafficCell = document.createElement('td');
+                    trafficCell.textContent = `LTE: ${lteTotal.toFixed(1)}kb, UID: ${uidTotal.toFixed(1)}kb, Total: ${overallTotal.toFixed(1)}kb`;
+                    row.appendChild(trafficCell);
+                } else {
+                    const trafficCell = document.createElement('td');
+                    trafficCell.textContent = 'No data';
+                    row.appendChild(trafficCell);
+                }
 
                 table.appendChild(row);
             });
