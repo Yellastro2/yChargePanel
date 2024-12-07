@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach((station, index) => {
                 const row = document.createElement('tr');
                 row.setAttribute('data-index', index);
+                row.setAttribute('onclick', `goToStation('${station.stId}')`);
 
                 const stIdCell = document.createElement('td');
                 stIdCell.textContent = station.stId;
@@ -55,3 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => console.error('Error fetching station list:', error));
 });
+
+function goToStation(stId) {
+    window.location.href = `/station/${stId}`;
+}
