@@ -10,12 +10,13 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import redis.clients.jedis.Jedis
 import redis.clients.jedis.JedisPoolConfig
 import redis.clients.jedis.JedisPool
@@ -28,7 +29,7 @@ import java.util.concurrent.TimeoutException
 data class Station(val id: String, val name: String)
 
 @Serializable
-data class CheckinData(val stId: String, val size: Int, val available: Int)
+data class CheckinData(val stId: String, val size: Int, val state: String)
 
 fun Application.configureRouting() {
 
@@ -48,9 +49,9 @@ fun Application.configureRouting() {
 
     val jedisPool = JedisPool(
         JedisPoolConfig().apply {
-            maxTotal = 8 // Максимальное количество соединений в пуле
-            maxIdle = 4 // Максимальное количество неиспользуемых соединений в пуле
-            maxWaitMillis = 1000L // Максимальное время ожидания соединения
+            maxTotal = 30 // Максимальное количество соединений в пуле
+            maxIdle = 15 // Максимальное количество неиспользуемых соединений в пуле
+            maxWaitMillis = 3000L // Максимальное время ожидания соединения
         },
         REDIS_HOST,
         REDIS_PORT,
@@ -75,10 +76,14 @@ fun Application.configureRouting() {
 
     val waitMap = ConcurrentHashMap<String, CompletableFuture<JsonObject?>>()
 
-    fun waitForEventOrTimeout(stId: String, timeout: Int): JsonObject? {
+    suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JsonObject? {
         val future = waitMap.computeIfAbsent(stId) { CompletableFuture<JsonObject?>() }
         return try {
-            future.get((timeout - 5).toLong(), TimeUnit.SECONDS)
+            withTimeoutOrNull((if (timeout > 5) timeout - 5 else 0).toLong() * 1000) {
+                future.await()
+            }
+        }catch (e: TimeoutCancellationException) {
+             null
         } catch (e: TimeoutException) {
             null
         } finally {
@@ -102,20 +107,20 @@ fun Application.configureRouting() {
             try {
                 val stId = call.request.queryParameters["stId"]
                 val size = call.request.queryParameters["size"]?.toIntOrNull()
-                val available = call.request.queryParameters["available"]?.toIntOrNull()
+                val state = call.request.queryParameters["state"]
                 val timeoutHeader = call.request.headers["X-Timeout"]?.toIntOrNull()
                 val trafficLastDay = call.request.queryParameters["traffic"]
                 print(trafficLastDay)
 
-                if (stId != null && size != null && available != null && timeoutHeader != null) {
-                    val checkinData = CheckinData(stId, size, available)
+                if (stId != null && size != null && state != null && timeoutHeader != null) {
+                    val checkinData = CheckinData(stId, size, state)
                     val timestamp = System.currentTimeMillis() / 1000
 
                     val key = "Stations:${checkinData.stId}"
                     val value = mapOf(
                         "stId" to checkinData.stId,
                         "size" to checkinData.size.toString(),
-                        "available" to checkinData.available.toString(),
+                        "state" to checkinData.state,
                         "timestamp" to timestamp.toString(),
                         "trafficLastDay" to trafficLastDay
                     )
@@ -183,7 +188,7 @@ fun Application.configureRouting() {
                         val fields = jedis.hgetAll(key)
                         val stId = fields["stId"]
                         val size = fields["size"]?.toIntOrNull()
-                        val available = fields["available"]?.toIntOrNull()
+                        val available = fields["state"]?.let{ Json.parseToJsonElement(it).jsonObject.size }?: null
                         val timestamp = fields["timestamp"]?.toLongOrNull()
                         val trafficLastDay = fields["trafficLastDay"]
 
@@ -230,18 +235,18 @@ fun Application.configureRouting() {
                     val fields = jedis.hgetAll(key)
                     val stId = fields["stId"]
                     val size = fields["size"]?.toIntOrNull()
-                    val available = fields["available"]?.toIntOrNull()
+                    val state = fields["state"]?.let{ Json.parseToJsonElement(it).jsonObject}
                     val timestamp = fields["timestamp"]?.toLongOrNull()
                     val trafficLastDay = fields["trafficLastDay"]
 
 
 
-                    if (stId != null && size != null && available != null && timestamp != null) {
+                    if (stId != null && size != null && state != null && timestamp != null) {
                         val fStationJson = JsonObject(
                             mapOf(
                                 "stId" to JsonPrimitive(stId),
                                 "size" to JsonPrimitive(size),
-                                "available" to JsonPrimitive(available),
+                                "state" to state,
                                 "timestamp" to JsonPrimitive(timestamp),
                                 "trafficLastDay" to JsonPrimitive(trafficLastDay)
                             )
