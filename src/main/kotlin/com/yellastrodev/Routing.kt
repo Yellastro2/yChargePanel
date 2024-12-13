@@ -17,6 +17,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import org.json.JSONArray
+import org.json.JSONObject
 import redis.clients.jedis.Jedis
 import redis.clients.jedis.JedisPoolConfig
 import redis.clients.jedis.JedisPool
@@ -107,23 +109,63 @@ fun Application.configureRouting() {
             try {
                 val stId = call.request.queryParameters["stId"]
                 val size = call.request.queryParameters["size"]?.toIntOrNull()
-                val state = call.request.queryParameters["state"]
+                var state = call.request.queryParameters["state"]
                 val timeoutHeader = call.request.headers["X-Timeout"]?.toIntOrNull()
                 val trafficLastDay = call.request.queryParameters["traffic"]
+                val events = call.request.queryParameters["events"]
                 print(trafficLastDay)
 
-                if (stId != null && size != null && state != null && timeoutHeader != null) {
-                    val checkinData = CheckinData(stId, size, state)
+                if (stId != null && timeoutHeader != null) {
+//                    val checkinData = CheckinData(stId, size, state)
                     val timestamp = System.currentTimeMillis() / 1000
 
-                    val key = "Stations:${checkinData.stId}"
-                    val value = mapOf(
-                        "stId" to checkinData.stId,
-                        "size" to checkinData.size.toString(),
-                        "state" to checkinData.state,
-                        "timestamp" to timestamp.toString(),
-                        "trafficLastDay" to trafficLastDay
+                    val key = "Stations:${stId}"
+                    val value = hashMapOf(
+                        "stId" to stId,
+                        "timestamp" to timestamp.toString()
                     )
+                    size?.let { value["size"] = it.toString() }
+
+                    trafficLastDay?.let { value["trafficLastDay"] = it }
+
+                    events?.let {
+                        val fEventsJSON = JSONArray(it)
+                        val fEventsSort = fEventsJSON.sortedBy {
+                            (it as JSONObject).getInt("date")
+                        }
+
+                        val stateJSON = state?.let { JSONObject(it) }?: run {
+                            if (jedis.type(key) != "hash") {
+                                jedis.del(key)
+                                return@run JSONObject()
+                            }
+                            val fields = jedis.hgetAll(key)
+                            fields["state"]?. let { itStateFromRedis ->
+                                JSONObject(itStateFromRedis)
+                            }?: JSONObject()
+                        }
+                        val stateStringPrevius = stateJSON.toString()
+
+                        fEventsSort.forEach {
+                            val qEvent = it as JSONObject
+                            val qSlot = qEvent.getString(EVENT_SLOT_ID)
+                            val qEventType = qEvent.getString(EVENT_TYPE)
+                            if (stateJSON.has(qSlot)) {
+                                if (qEventType == EVENT_REMOVE_BANK)
+                                    stateJSON.remove(qSlot)
+                            } else {
+                                if (qEventType != EVENT_REMOVE_BANK)
+                                    stateJSON.put(qSlot, qEvent)
+                            }
+                        }
+
+                        if (stateStringPrevius != stateJSON.toString())
+                            state = stateJSON.toString()
+                        //TODO
+                    }
+
+
+                    state?.let { value["state"] = it }
 
 
                     // Проверка типа данных ключа
@@ -144,9 +186,9 @@ fun Application.configureRouting() {
                     }
 
 
-                    var resp = "Station added: ${checkinData.stId}"
+                    var resp = "Station added: ${stId}"
                     if (exists) {
-                        resp = "Station updated: ${checkinData.stId}"
+                        resp = "Station updated: ${stId}"
                     }
 
                     call.respond(HttpStatusCode.OK, response.toString())

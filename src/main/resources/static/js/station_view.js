@@ -1,20 +1,37 @@
 let previousData = null;
 
+let isFocused = true
+
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+        // Страница в фокусе, можно обновлять информацию
+        console.log('Начинаем обновление информации');
+        isFocused = true
+    } else {
+        // Страница не в фокусе, остановить обновление информации
+        console.log('Останавливаем обновление информации');
+        isFocused = false
+    }
+});
+
+
+
 document.addEventListener('DOMContentLoaded', function() {
     const currentHost = window.location.origin;
     const stId = getLastSegment(window.location.href); // Получение stId из URL
     const apiUrl = `${currentHost}/api/stationInfo?stId=${stId}`;
 
     function fetchData() {
-        fetch(apiUrl)
-            .then(response => response.json())
-            .then(data => {
-                if (JSON.stringify(data) !== JSON.stringify(previousData)) {
-                    previousData = data;
-                    updateTable(data);
-                }
-            })
-            .catch(error => console.error('Error fetching station info:', error));
+        if (isFocused)
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (JSON.stringify(data) !== JSON.stringify(previousData)) {
+                        previousData = data;
+                        updateTable(data);
+                    }
+                })
+                .catch(error => console.error('Error fetching station info:', error));
     }
 
     function updateTable(data) {
