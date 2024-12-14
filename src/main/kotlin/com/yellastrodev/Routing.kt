@@ -153,14 +153,19 @@ fun Application.configureRouting() {
                             if (stateJSON.has(qSlot)) {
                                 if (qEventType == EVENT_REMOVE_BANK)
                                     stateJSON.remove(qSlot)
+                                 else {
+                                    stateJSON.put(qSlot, qEvent)
+                                }
                             } else {
-                                if (qEventType != EVENT_REMOVE_BANK)
+                                if (qEventType == EVENT_ADD_BANK)
                                     stateJSON.put(qSlot, qEvent)
                             }
                         }
 
-                        if (stateStringPrevius != stateJSON.toString())
+                        if (stateStringPrevius != stateJSON.toString()) {
                             state = stateJSON.toString()
+                            print("NEW EVENT RECEIVED")
+                        }
                         //TODO
                     }
 
