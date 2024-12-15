@@ -60,6 +60,8 @@ fun Application.configureRouting() {
         6000,
         REDIS_PAS)
 
+    val MAX_EVENTS_SIZE = 100
+
 
     install(ContentNegotiation) {
         json(Json {
@@ -100,7 +102,7 @@ fun Application.configureRouting() {
         ))
     }
 
-    val MAX_EVENTS_SIZE = 100
+
 
     routing {
 
@@ -138,7 +140,10 @@ fun Application.configureRouting() {
 
                         val fields = jedis.hgetAll(key)
 
-                        val fPreviusEvents = JSONArray(fields["events"]?: "[]")
+                        var fEvents = fields["events"]?: "[]"
+                        if (fEvents == "")
+                            fEvents = "[]"
+                        val fPreviusEvents = JSONArray(fEvents)
 
 
 
@@ -314,7 +319,8 @@ fun Application.configureRouting() {
                                 "trafficLastDay" to trafficLastDay
                             )
                         )
-                        fields["events"]?.let {fStationJson.put("events",JSONArray(it))}
+                        fields["events"]?.let {
+                            fStationJson.put("events",JSONArray(if (it != "") it else "[]"))}
                         call.respond(HttpStatusCode.OK, fStationJson.toString())
                     } else {
                         call.respond(HttpStatusCode.OK, "somethk wrong")
