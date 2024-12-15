@@ -14,6 +14,16 @@ document.addEventListener('visibilitychange', function() {
     }
 });
 
+function formatTimestamp(timestamp) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    day: '2-digit',
+    month: '2-digit'
+  }).format(new Date(timestamp));
+}
+
 
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -37,8 +47,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateTable(data) {
         const table = document.getElementById('station_table');
         table.innerHTML = ''; // Очищаем таблицу
-        const size = data.size;
+        const size = parseInt(data.size, 10);
         const state = data.state || {};
+
+        const layout_top = document.getElementById('layout_top');
+        layout_top.textContent = "Станция "+ data.stId +", онлайн: " + formatTimestamp(data.timestamp * 1000);
 
         for (let i = 1; i <= size; i++) {
             const row = document.createElement('tr');
@@ -84,6 +97,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             table.appendChild(row);
+        }
+
+        // Добавляем новые карточки на страницу
+        const layoutBottom = document.getElementById('layout_bottom');
+        layoutBottom.innerHTML = ''; // Очистка перед добавлением новых элементов
+
+        if (data.events && Array.isArray(data.events)) {
+
+            data.events.sort((a, b) => b.date - a.date);
+            data.events.forEach(event => {
+                event.date = formatTimestamp(event.date);
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card mb-4';
+
+                const cardBodyDiv = document.createElement('div');
+                cardBodyDiv.className = 'card-body';
+                cardBodyDiv.innerHTML = JSON.stringify(event, null, 2);
+
+                cardDiv.appendChild(cardBodyDiv);
+                layoutBottom.appendChild(cardDiv);
+            });
         }
     }
 

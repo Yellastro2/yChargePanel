@@ -100,6 +100,8 @@ fun Application.configureRouting() {
         ))
     }
 
+    val MAX_EVENTS_SIZE = 100
+
     routing {
 
         static("/static") { resources("static") }
@@ -134,12 +136,18 @@ fun Application.configureRouting() {
                             (it as JSONObject).getInt("date")
                         }
 
+                        val fields = jedis.hgetAll(key)
+
+                        val fPreviusEvents = JSONArray(fields["events"]?: "[]")
+
+
+
                         val stateJSON = state?.let { JSONObject(it) }?: run {
                             if (jedis.type(key) != "hash") {
                                 jedis.del(key)
                                 return@run JSONObject()
                             }
-                            val fields = jedis.hgetAll(key)
+
                             fields["state"]?. let { itStateFromRedis ->
                                 JSONObject(itStateFromRedis)
                             }?: JSONObject()
@@ -148,19 +156,27 @@ fun Application.configureRouting() {
 
                         fEventsSort.forEach {
                             val qEvent = it as JSONObject
-                            val qSlot = qEvent.getString(EVENT_SLOT_ID)
-                            val qEventType = qEvent.getString(EVENT_TYPE)
-                            if (stateJSON.has(qSlot)) {
-                                if (qEventType == EVENT_REMOVE_BANK)
-                                    stateJSON.remove(qSlot)
-                                 else {
-                                    stateJSON.put(qSlot, qEvent)
+                            fPreviusEvents.put(qEvent)
+                            if (qEvent.has(EVENT_SLOT_ID)) {
+                                val qSlot = qEvent.getString(EVENT_SLOT_ID)
+                                val qEventType = qEvent.getString(EVENT_TYPE)
+                                if (stateJSON.has(qSlot)) {
+                                    if (qEventType == EVENT_REMOVE_BANK)
+                                        stateJSON.remove(qSlot)
+                                    else {
+                                        stateJSON.put(qSlot, qEvent)
+                                    }
+                                } else {
+                                    if (qEventType == EVENT_ADD_BANK)
+                                        stateJSON.put(qSlot, qEvent)
                                 }
-                            } else {
-                                if (qEventType == EVENT_ADD_BANK)
-                                    stateJSON.put(qSlot, qEvent)
                             }
                         }
+
+                        while (fPreviusEvents.length() > MAX_EVENTS_SIZE)
+                            fPreviusEvents.remove(0)
+
+                        value["events"] = JSONArray(fPreviusEvents).toString()
 
                         if (stateStringPrevius != stateJSON.toString()) {
                             state = stateJSON.toString()
@@ -282,22 +298,23 @@ fun Application.configureRouting() {
                     val fields = jedis.hgetAll(key)
                     val stId = fields["stId"]
                     val size = fields["size"]?.toIntOrNull()
-                    val state = fields["state"]?.let{ Json.parseToJsonElement(it).jsonObject}
+                    val state = fields["state"]?.let{ JSONObject(it)}
                     val timestamp = fields["timestamp"]?.toLongOrNull()
                     val trafficLastDay = fields["trafficLastDay"]
 
 
 
                     if (stId != null && size != null && state != null && timestamp != null) {
-                        val fStationJson = JsonObject(
+                        val fStationJson = JSONObject(
                             mapOf(
-                                "stId" to JsonPrimitive(stId),
-                                "size" to JsonPrimitive(size),
+                                "stId" to stId,
+                                "size" to size,
                                 "state" to state,
-                                "timestamp" to JsonPrimitive(timestamp),
-                                "trafficLastDay" to JsonPrimitive(trafficLastDay)
+                                "timestamp" to timestamp,
+                                "trafficLastDay" to trafficLastDay
                             )
                         )
+                        fields["events"]?.let {fStationJson.put("events",JSONArray(it))}
                         call.respond(HttpStatusCode.OK, fStationJson.toString())
                     } else {
                         call.respond(HttpStatusCode.OK, "somethk wrong")
