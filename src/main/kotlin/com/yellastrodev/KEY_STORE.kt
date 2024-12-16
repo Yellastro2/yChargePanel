@@ -1,4 +1,7 @@
-package com.yellastrodev
+package com.yellastrodev.ymtserial
+
+import java.text.SimpleDateFormat
+import java.util.*
 
 val EVENT_TYPE = "type"
 
@@ -23,6 +26,13 @@ val EVENT_DESTROY = "destroy"
 val EVENT_CREATE = "create"
 
 val EVENT_NETWORK = "network"
+
+val ROUT_UPLOADLOGS = "uploadLogs"
+
+val CMD_RELEASE = "release"
+val CMD_GETLOGS = "getLogs"
+
+val logFileDateFormat = SimpleDateFormat("yyyy.MM.dd_HH-mm-ss", Locale.getDefault())
 
 class KEY_STORE {
 }

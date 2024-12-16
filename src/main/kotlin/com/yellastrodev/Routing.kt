@@ -1,6 +1,8 @@
 package com.yellastrodev
 
+import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -10,11 +12,14 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.utils.io.*
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.html.*
+import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.json.JSONArray
@@ -26,6 +31,9 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 
 @Serializable
 data class Station(val id: String, val name: String)
@@ -43,6 +51,8 @@ fun Application.configureRouting() {
 //            InetSocketAddress(proxyHost, proxyPort))
 //        this.password = redisPassword
 //    }
+
+    val PATH_LOGFILES = "logfiles"
 
     val REDIS_HOST = "redis-12703.c327.europe-west1-2.gce.redns.redis-cloud.com"
     val REDIS_PORT = 12703
@@ -241,6 +251,43 @@ fun Application.configureRouting() {
         }
 
 
+        fun findLatestLogFile(dir: File): File? {
+            var latestFile: File? = null
+            var latestDate: Long = 0L
+
+            dir.listFiles()?.forEach { file ->
+                val name = file.name
+                if (name.startsWith("app_") && name.endsWith(".log")) {
+                    try {
+                        val dateString = name.substring(4, name.length - 4)
+                        val date = logFileDateFormat.parse(dateString)
+                        if (date != null && date.time > latestDate) {
+                            latestDate = date.time
+                            latestFile = file
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+            return latestFile
+        }
+
+
+        get("/api/getLogs") {
+            val stId = call.request.queryParameters["stId"]
+            val uploadDir = File("${PATH_LOGFILES}/${stId}")
+            val lastLogFile = findLatestLogFile(uploadDir)?.name?: "0"
+            if (stId != null) {
+                // TODO_1
+                waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
+                call.respond(HttpStatusCode.OK, """{"status": "getting.."}""")
+            } else {
+                call.respond(HttpStatusCode.BadRequest, "Invalid or missing 'stId'")
+            }
+        }
+
+
         get("/api/stationList") {
             val jedis = jedisPool.resource
             try {
@@ -333,8 +380,55 @@ fun Application.configureRouting() {
             }finally {
                 jedis.close()
             }
-
         }
+
+        fun extractZip(zipFile: File, outputDir: File) {
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+            }
+
+            ZipInputStream(zipFile.inputStream()).use { zis ->
+                var entry: ZipEntry?
+                while (zis.nextEntry.also { entry = it } != null) {
+                    val newFile = File(outputDir, entry!!.name)
+                    if (entry!!.isDirectory) {
+                        newFile.mkdirs()
+                    } else {
+                        newFile.parentFile.mkdirs()
+                        newFile.outputStream().use { fos ->
+                            zis.copyTo(fos)
+                        }
+                    }
+                }
+            }
+        }
+
+
+
+
+        post("api/$ROUT_UPLOADLOGS") {
+            val stId = call.request.queryParameters.get("stId")
+            val multipart = call.receiveMultipart()
+            multipart.forEachPart { part ->
+                if (part is PartData.FileItem) {
+//            val parts = multipart.readAllParts()
+//            parts.filterIsInstance<PartData.FileItem>().forEach { part ->
+                    val fileBytes = part.provider.invoke().readRemaining().readByteArray()
+                    val uploadDir = File("${PATH_LOGFILES}/${stId}")
+                    if (!uploadDir.exists()) {
+                        uploadDir.mkdirs() // создаем директорию, если она не существует
+                    }
+                    val zipFile = File(uploadDir,part.originalFileName ?: "uploaded-archive.zip")
+                    zipFile.writeBytes(fileBytes)
+                    extractZip(zipFile, uploadDir)
+                    part.dispose()
+                }
+            }
+            call.respondText("Archive uploaded and extracted successfully")
+        }
+
+
+
 
 
 

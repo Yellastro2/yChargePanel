@@ -50,6 +50,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     row.appendChild(trafficCell);
                 }
 
+                const actionsCell = document.createElement('td');
+
+                if (stateData) {
+                                row.appendChild(actionsCell);
+                            }
+
+                const getLogButton = document.createElement('button');
+                                        getLogButton.textContent = 'Логи';
+                                        getLogButton.onclick = () => getLogs(currentHost, stId);
+                                        actionsCell.appendChild(getLogButton);
+
                 table.appendChild(row);
             });
 

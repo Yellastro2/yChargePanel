@@ -92,6 +92,11 @@ document.addEventListener('DOMContentLoaded', function() {
             blockButton.onclick = () => alert(`Заблокировать ${stateData ? stateData.bankId : data.stId}`);
             actionsCell.appendChild(blockButton);
 
+            const getLogButton = document.createElement('button');
+                        getLogButton.textContent = 'Логи';
+                        getLogButton.onclick = () => getLogs(currentHost, stId);
+                        actionsCell.appendChild(getLogButton);
+
             if (stateData) {
                 row.appendChild(actionsCell);
             }
@@ -132,6 +137,16 @@ function getLastSegment(url) {
     const urlWithoutParams = url.split('?')[0]; // Убираем параметры
     const parts = urlWithoutParams.split('/');
     return parts.pop() || parts.pop();  // Учитываем случай, если URL оканчивается на '/'
+}
+
+function getLogs(currentHost, stId) {
+    const apiUrl = `${currentHost}/api/getLogs?stId=${stId}`;
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+//            alert(`Слот ${num} открыт: ${data.status}`);
+        })
+        .catch(error => console.error('Error getting logs:', error));
 }
 
 function releaseSlot(currentHost, stId, num) {
