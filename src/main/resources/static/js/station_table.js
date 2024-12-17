@@ -52,13 +52,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const actionsCell = document.createElement('td');
 
-                if (stateData) {
-                                row.appendChild(actionsCell);
-                            }
+//                if (stateData) {
+                row.appendChild(actionsCell);
+//                            }
 
                 const getLogButton = document.createElement('button');
                                         getLogButton.textContent = 'Логи';
-                                        getLogButton.onclick = () => getLogs(currentHost, stId);
+                                        getLogButton.onclick = () => getLogs(currentHost, station.stId);
                                         actionsCell.appendChild(getLogButton);
 
                 table.appendChild(row);
@@ -67,6 +67,17 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => console.error('Error fetching station list:', error));
 });
+
+function getLogs(currentHost, stId) {
+    const apiUrl = `${currentHost}/api/getLogs?stId=${stId}`;
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+//            alert(`Слот ${num} открыт: ${data.status}`);
+                console.log('запрос логов: ${data}');
+        })
+        .catch(error => console.error('Error getting logs:', error));
+}
 
 function goToStation(stId) {
     window.location.href = `/station/${stId}`;

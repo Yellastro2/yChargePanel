@@ -27,13 +27,15 @@ import org.json.JSONObject
 import redis.clients.jedis.Jedis
 import redis.clients.jedis.JedisPoolConfig
 import redis.clients.jedis.JedisPool
+import java.io.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import java.io.File
+import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 @Serializable
 data class Station(val id: String, val name: String)
@@ -53,6 +55,7 @@ fun Application.configureRouting() {
 //    }
 
     val PATH_LOGFILES = "logfiles"
+    val TIMEOUT_LOG_UPLOAD = 60L
 
     val REDIS_HOST = "redis-12703.c327.europe-west1-2.gce.redns.redis-cloud.com"
     val REDIS_PORT = 12703
@@ -273,6 +276,37 @@ fun Application.configureRouting() {
             return latestFile
         }
 
+        // Карта для хранения колбеков
+         val uploadLogsCallbacks = mutableMapOf<String, CompletableFuture<Unit>>()
+
+        fun zipFiles(files: List<File>, zipFile: File) {
+            if (zipFile.exists()) {
+                zipFile.delete()
+            }
+
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { out ->
+                files.filter { file ->
+                    (file.name.endsWith(".log") )
+                }.forEach { file ->
+                    FileInputStream(file).use { fi ->
+                        BufferedInputStream(fi).use { origin ->
+                            val entry = ZipEntry(file.name.replace(" ","_").replace(":","-"))
+                            out.putNextEntry(entry)
+                            origin.copyTo(out, 1024)
+                        }
+                    }
+                }
+            }
+        }
+
+
+        fun getLastLogZip(stId: String): File {
+            val uploadDir = File("${PATH_LOGFILES}/${stId}")
+             val zipFile = File(uploadDir, "logs_upload_${stId}.zip")
+             val files = uploadDir.listFiles()?.toList() ?: emptyList()
+             zipFiles(files, zipFile)
+            return zipFile
+        }
 
         get("/api/getLogs") {
             val stId = call.request.queryParameters["stId"]
@@ -280,8 +314,36 @@ fun Application.configureRouting() {
             val lastLogFile = findLatestLogFile(uploadDir)?.name?: "0"
             if (stId != null) {
                 // TODO_1
-                waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
-                call.respond(HttpStatusCode.OK, """{"status": "getting.."}""")
+                // Проверяем, на связи ли клиент
+                val isClientConnected = waitMap.containsKey(stId)
+                if (isClientConnected) {
+                    // Создаем CompletableFuture для загрузки логов
+                     val uploadFuture = CompletableFuture<Unit>()
+                    uploadLogsCallbacks[stId] = uploadFuture
+
+                    // Отправляем команду на получение логов
+                    waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
+
+                    // Ожидаем загрузки логов
+                    val uploadCompleted = withTimeoutOrNull(TIMEOUT_LOG_UPLOAD * 1000) {
+                        uploadLogsCallbacks[stId]?.await()
+                    }
+                    if (uploadCompleted != null) {
+                        print("""{"status": "logs uploaded"}""")
+//                        call.respond(HttpStatusCode.OK, """{"status": "logs uploaded"}""")
+                    } else {
+                        print("""{"status": "upload timeout"}""")
+//                        call.respond(HttpStatusCode.RequestTimeout, """{"status": "upload timeout"}""")
+                    }
+                } else {
+                    // Клиент не на связи, сразу отвечаем
+                    print("""{"status": "client not connected"}""")
+//                    call.respond(HttpStatusCode.OK, """{"status": "client not connected"}""")
+                }
+                val zipFile = getLastLogZip(stId)
+                call.respondFile(zipFile)
+//                waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
+//                call.respond(HttpStatusCode.OK, """{"status": "getting.."}""")
             } else {
                 call.respond(HttpStatusCode.BadRequest, "Invalid or missing 'stId'")
             }
@@ -424,6 +486,11 @@ fun Application.configureRouting() {
                     part.dispose()
                 }
             }
+
+            // Вызываем колбек, если он существует
+             uploadLogsCallbacks[stId]?.complete(Unit)
+            uploadLogsCallbacks.remove(stId)
+
             call.respondText("Archive uploaded and extracted successfully")
         }
 

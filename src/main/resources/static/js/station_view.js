@@ -53,6 +53,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const layout_top = document.getElementById('layout_top');
         layout_top.textContent = "Станция "+ data.stId +", онлайн: " + formatTimestamp(data.timestamp * 1000);
 
+        const getLogButton = document.createElement('button');
+        getLogButton.textContent = 'Логи';
+        getLogButton.onclick = () => getLogs(currentHost, stId);
+        layout_top.appendChild(getLogButton);
+
         for (let i = 1; i <= size; i++) {
             const row = document.createElement('tr');
 
@@ -92,10 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             blockButton.onclick = () => alert(`Заблокировать ${stateData ? stateData.bankId : data.stId}`);
             actionsCell.appendChild(blockButton);
 
-            const getLogButton = document.createElement('button');
-                        getLogButton.textContent = 'Логи';
-                        getLogButton.onclick = () => getLogs(currentHost, stId);
-                        actionsCell.appendChild(getLogButton);
+
 
             if (stateData) {
                 row.appendChild(actionsCell);
@@ -124,13 +126,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 layoutBottom.appendChild(cardDiv);
             });
         }
+
+
     }
 
     // Первичный вызов для загрузки данных
     fetchData();
 
     // Периодический вызов каждые 5 секунд
-    setInterval(fetchData, 1000);
+    setInterval(fetchData, 10000);
 });
 
 function getLastSegment(url) {
@@ -142,12 +146,26 @@ function getLastSegment(url) {
 function getLogs(currentHost, stId) {
     const apiUrl = `${currentHost}/api/getLogs?stId=${stId}`;
     fetch(apiUrl)
-        .then(response => response.json())
-        .then(data => {
-//            alert(`Слот ${num} открыт: ${data.status}`);
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `logs_${stId}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            console.log('Logs successfully downloaded.');
         })
         .catch(error => console.error('Error getting logs:', error));
 }
+
 
 function releaseSlot(currentHost, stId, num) {
     const apiUrl = `${currentHost}/api/release?stId=${stId}&num=${num}`;
