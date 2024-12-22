@@ -108,15 +108,17 @@ fun Application.configureRouting() {
         }
     }
 
-    fun createCommanJson(fComand: JsonObject): JsonObject {
-        return JsonObject(mapOf(
-            "command" to JsonPrimitive(fComand.keys.first()),
+    fun createCommanJson(fComand: JsonObject): JSONObject {
+        return JSONObject(mapOf(
+            "command" to fComand.keys.first(),
             "value" to fComand.values.first()
         ))
     }
 
 
-
+    fun sendCommandToStation(stId: String?, commandJSON: JsonObject) {
+        waitMap[stId]?.complete(commandJSON)
+    }
     routing {
 
         static("/static") { resources("static") }
@@ -157,8 +159,6 @@ fun Application.configureRouting() {
                         if (fEvents == "")
                             fEvents = "[]"
                         val fPreviusEvents = JSONArray(fEvents)
-
-
 
                         val stateJSON = state?.let { JSONObject(it) }?: run {
                             if (jedis.type(key) != "hash") {
@@ -203,8 +203,16 @@ fun Application.configureRouting() {
                         //TODO
                     }
 
+                    var onlineState: JSONObject? = null
 
-                    state?.let { value["state"] = it }
+                    state?.let {
+                        value["state"] = it
+                        val fields = jedis.hgetAll(key)
+                        val stateJSON = JSONObject(fields)
+                        if (stateJSON.has("wallpaper"))
+                            onlineState = JSONObject(
+                                mapOf("wallpaper" to stateJSON.getString("wallpaper")))
+                    }
 
 
                     // Проверка типа данных ключа
@@ -221,7 +229,11 @@ fun Application.configureRouting() {
                         createCommanJson(newEvent)
 //                        JsonObject(mapOf("command" to JsonPrimitive("pong"), "code" to JsonPrimitive(200)))
                     } else {
-                        JsonObject(mapOf("command" to JsonPrimitive("pong"), "code" to JsonPrimitive(200)))
+                        JSONObject(mapOf("command" to "pong", "code" to 200))
+                    }
+
+                    onlineState?.let {
+                        response.put("onlineState",it)
                     }
 
 
@@ -234,6 +246,7 @@ fun Application.configureRouting() {
                 } else {
                     call.respond(HttpStatusCode.BadRequest, "Missing or invalid query parameters")
                 }
+
             }catch (e: Exception){
                 e.printStackTrace()
             }finally {
@@ -246,11 +259,76 @@ fun Application.configureRouting() {
             val num = call.request.queryParameters["num"]
             if (stId != null && num != null) {
 
-                waitMap[stId]?.complete(JsonObject(mapOf("release" to JsonPrimitive(num))))
+//                waitMap[stId]?.complete(JsonObject(mapOf("release" to JsonPrimitive(num))))
+                sendCommandToStation(stId, JsonObject(mapOf("release" to JsonPrimitive(num))))
                 call.respond(HttpStatusCode.OK, """{"status": "released"}""")
             } else {
+
                 call.respond(HttpStatusCode.BadRequest, "Invalid or missing 'stId' or 'num' parameter")
             }
+        }
+
+
+        fun setWallpaper(stId: String?, newFileName: String) {
+            // поменять значение обоев в базе данных + отправить команду станции о смене обоев.
+            // если даже команда не дойдет (мб офлайн), станция всёравно замет что id обоев стали разными локально и в базе
+
+            val jedis = jedisPool.resource
+            try {
+                val key = "Stations:${stId}"
+                val fields = jedis.hgetAll(key)
+                val oldFileName = fields[CMD_CHANGE_WALLPAPER]
+                if (oldFileName != newFileName) {
+                    fields[CMD_CHANGE_WALLPAPER] = newFileName
+                    jedis.hset(key, CMD_CHANGE_WALLPAPER, newFileName)
+                    sendCommandToStation(stId,JsonObject(mapOf(CMD_CHANGE_WALLPAPER to JsonPrimitive(newFileName))))
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                jedis.close()
+            }
+        }
+
+        get("/api/download") {
+            val filePath = call.request.queryParameters["path"]
+            if (filePath != null) {
+                val file = File("uploads/$filePath")
+                if (file.exists()) {
+                    call.respondFile(file)
+                } else {
+                    call.respond(HttpStatusCode.NotFound, "Файл не найден")
+                }
+            } else {
+                call.respond(HttpStatusCode.BadRequest, "Параметр 'path' отсутствует")
+            }
+        }
+
+        post("/api/upload/{stId}") {
+            val stId = call.parameters["stId"]
+            val uploadDir = File("uploads/wallpapers")
+            if (!uploadDir.exists()) {
+                uploadDir.mkdirs()
+            }
+
+            // Найти максимальный номер файла
+            val maxFileNumber = uploadDir.listFiles()?.mapNotNull {
+                it.name.substringBeforeLast(".").toIntOrNull()
+            }?.maxOrNull() ?: 0
+            val newFileName = "${maxFileNumber + 1}.jpg"
+
+            val multipart = call.receiveMultipart()
+            multipart.forEachPart { part ->
+                if (part is PartData.FileItem) {
+                    val fileBytes = part.provider.invoke().readRemaining().readByteArray()
+                    File(uploadDir, newFileName).writeBytes(fileBytes)
+                }
+                part.dispose()
+            }
+
+            setWallpaper(stId,newFileName)
+
+            call.respondRedirect("/station/${stId}")
         }
 
 
@@ -322,7 +400,8 @@ fun Application.configureRouting() {
                     uploadLogsCallbacks[stId] = uploadFuture
 
                     // Отправляем команду на получение логов
-                    waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
+                    sendCommandToStation(stId, JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
+//                    waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
 
                     // Ожидаем загрузки логов
                     val uploadCompleted = withTimeoutOrNull(TIMEOUT_LOG_UPLOAD * 1000) {
@@ -499,6 +578,8 @@ fun Application.configureRouting() {
 
 
 
+
+
         authenticate("auth-session") {
             get("/admin") {
                 val header = readHtml("header.html")
@@ -534,3 +615,5 @@ fun Application.configureRouting() {
         }
     }
 }
+
+

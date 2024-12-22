@@ -51,12 +51,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const state = data.state || {};
 
         const layout_top = document.getElementById('layout_top');
-        layout_top.textContent = "Станция "+ data.stId +", онлайн: " + formatTimestamp(data.timestamp * 1000);
+        const station_title = document.getElementById('station_name');
+        station_title.textContent = `Станция ${data.stId}, онлайн: ${formatTimestamp(data.timestamp * 1000)}`
 
-        const getLogButton = document.createElement('button');
-        getLogButton.textContent = 'Логи';
+        const getLogButton = document.getElementById('stations_log_button');
         getLogButton.onclick = () => getLogs(currentHost, stId);
-        layout_top.appendChild(getLogButton);
+        const form = document.getElementById('uploadForm');
+        form.action = `/api/upload/${stId}`;
 
         for (let i = 1; i <= size; i++) {
             const row = document.createElement('tr');
@@ -83,17 +84,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const actionsCell = document.createElement('td');
             const openButton = document.createElement('button');
+            openButton.className = 'btn btn-primary';
             openButton.textContent = 'Открыть';
             openButton.onclick = () => releaseSlot(currentHost, stId, i);
             actionsCell.appendChild(openButton);
 
             const forceButton = document.createElement('button');
             forceButton.textContent = 'Форс';
+            forceButton.className = 'btn btn-primary';
             forceButton.onclick = () => alert(`Форс ${stateData ? stateData.bankId : data.stId}`);
             actionsCell.appendChild(forceButton);
 
             const blockButton = document.createElement('button');
             blockButton.textContent = 'Заблокировать';
+            blockButton.className = 'btn btn-primary';
             blockButton.onclick = () => alert(`Заблокировать ${stateData ? stateData.bankId : data.stId}`);
             actionsCell.appendChild(blockButton);
 

@@ -24,13 +24,20 @@ val EVENT_BOOT_COMPLEATE = "boot compleate"
 
 val EVENT_DESTROY = "destroy"
 val EVENT_CREATE = "create"
+val EVENT_OPEN_DEV_ACTIVITY = "open_dev_activity"
+val EVENT_ERROR_OPEN_SERIALPORT = "error_open_serialport"
 
 val EVENT_NETWORK = "network"
 
+val STATE_KEYS_TRAFFIC = "traffic"
+
 val ROUT_UPLOADLOGS = "uploadLogs"
+val ROUT_CHECKIN = "checkin"
 
 val CMD_RELEASE = "release"
 val CMD_GETLOGS = "getLogs"
+val CMD_CHANGE_WALLPAPER = "wallpaper"
+
 
 val logFileDateFormat = SimpleDateFormat("yyyy.MM.dd_HH-mm-ss", Locale.getDefault())
 

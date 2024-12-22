@@ -79,6 +79,14 @@
                             <div class="datatable-wrapper datatable-loading no-footer sortable searchable fixed-columns">
                                 <div id="layout_top" class="datatable-top">
 
+                                    <div id="station_name" class="station_name"></div>
+
+                                    <button id="stations_log_button" type="button" class="btn btn-primary" >Логи</button>
+
+                                    <form id="uploadForm" action="/api/upload/${stId}" method="post" enctype="multipart/form-data">
+                                        <input type="file" name="image" accept="image/*" required>
+                                        <button type="submit">Загрузить</button>
+                                    </form>
                                 </div>
                                 <div class="datatable-container">
                                     <table id="datatablesSimple" class="datatable-table">

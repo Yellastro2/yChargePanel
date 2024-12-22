@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const table = document.getElementById('station_table');
             data.forEach((station, index) => {
                 const row = document.createElement('tr');
+
                 row.setAttribute('data-index', index);
                 row.setAttribute('onclick', `goToStation('${station.stId}')`);
 
