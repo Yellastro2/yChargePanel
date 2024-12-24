@@ -8,15 +8,31 @@ plugins {
     kotlin("plugin.serialization").version("2.0.0")
 }
 
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "com.yellastrodev.ApplicationKt"
+    }
+}
+
+
+
 group = "com.yellastrodev"
 version = "1.0-SNAPSHOT"
 
 application {
-    mainClass.set("io.ktor.server.netty.EngineMain")
-
+    mainClass.set("com.yellastrodev.ApplicationKt")
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
+
+sourceSets {
+    getByName("main") {
+        resources {
+            srcDir("src/main/resources")
+        }
+    }
+}
+
 
 repositories {
     mavenCentral()
@@ -33,7 +49,7 @@ dependencies {
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.config.yaml)
     implementation(libs.logback.classic)
-    implementation("redis.clients:jedis:4.2.0") // Добавьте эту строку для Redis
+    implementation("redis.clients:jedis:4.2.0") // Redis
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 }

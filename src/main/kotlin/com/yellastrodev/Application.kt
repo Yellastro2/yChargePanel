@@ -5,6 +5,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.contentnegotiation.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.FileNotFoundException
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -14,8 +15,8 @@ fun main(args: Array<String>) {
 
 
 fun readHtml(filename: String): String {
-    val resource = object {}.javaClass.getResource("/templates/$filename")
-    return resource?.let { Files.readString(Paths.get(it.toURI())) } ?: ""
+    val resource = object {}.javaClass.getResourceAsStream("/templates/$filename")
+    return resource?.bufferedReader()?.use { it.readText() } ?: throw FileNotFoundException("Resource /templates/$filename not found")
 }
 
 

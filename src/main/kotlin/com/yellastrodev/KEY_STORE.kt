@@ -37,6 +37,7 @@ val ROUT_CHECKIN = "checkin"
 val CMD_RELEASE = "release"
 val CMD_GETLOGS = "getLogs"
 val CMD_CHANGE_WALLPAPER = "wallpaper"
+val CMD_CHANGE_QR = "QR_data"
 
 
 val logFileDateFormat = SimpleDateFormat("yyyy.MM.dd_HH-mm-ss", Locale.getDefault())

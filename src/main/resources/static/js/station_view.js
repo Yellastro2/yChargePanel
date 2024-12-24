@@ -59,6 +59,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('uploadForm');
         form.action = `/api/upload/${stId}`;
 
+        const qrForm = document.getElementById('changeQR');
+        qrForm.action = `/api/setQR/${stId}`;
+
+
+
         for (let i = 1; i <= size; i++) {
             const row = document.createElement('tr');
 

@@ -91,10 +91,10 @@ fun Application.configureRouting() {
         return null
     }
 
-    val waitMap = ConcurrentHashMap<String, CompletableFuture<JsonObject?>>()
+    val waitMap = ConcurrentHashMap<String, CompletableFuture<JSONObject?>>()
 
-    suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JsonObject? {
-        val future = waitMap.computeIfAbsent(stId) { CompletableFuture<JsonObject?>() }
+    suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JSONObject? {
+        val future = waitMap.computeIfAbsent(stId) { CompletableFuture<JSONObject?>() }
         return try {
             withTimeoutOrNull((if (timeout > 5) timeout - 5 else 0).toLong() * 1000) {
                 future.await()
@@ -108,15 +108,16 @@ fun Application.configureRouting() {
         }
     }
 
-    fun createCommanJson(fComand: JsonObject): JSONObject {
+    fun createCommanJson(fComand: JSONObject): JSONObject {
+        val fKey = fComand.keys().next()
         return JSONObject(mapOf(
-            "command" to fComand.keys.first(),
-            "value" to fComand.values.first()
+            "command" to fKey,
+            "value" to fComand[fKey]
         ))
     }
 
 
-    fun sendCommandToStation(stId: String?, commandJSON: JsonObject) {
+    fun sendCommandToStation(stId: String?, commandJSON: JSONObject) {
         waitMap[stId]?.complete(commandJSON)
     }
     routing {
@@ -203,7 +204,7 @@ fun Application.configureRouting() {
                         //TODO
                     }
 
-                    var onlineState: JSONObject? = null
+                    var onlineState: JSONObject = JSONObject()
 
                     state?.let {
                         value["state"] = it
@@ -212,6 +213,8 @@ fun Application.configureRouting() {
                         if (stateJSON.has("wallpaper"))
                             onlineState = JSONObject(
                                 mapOf("wallpaper" to stateJSON.getString("wallpaper")))
+                        if (stateJSON.has(CMD_CHANGE_QR))
+                            onlineState.put(CMD_CHANGE_QR, stateJSON.get(CMD_CHANGE_QR))
                     }
 
 
@@ -232,9 +235,10 @@ fun Application.configureRouting() {
                         JSONObject(mapOf("command" to "pong", "code" to 200))
                     }
 
-                    onlineState?.let {
-                        response.put("onlineState",it)
+                    if (onlineState.length() > 0) {
+                        response.put("onlineState",onlineState)
                     }
+
 
 
                     var resp = "Station added: ${stId}"
@@ -260,7 +264,7 @@ fun Application.configureRouting() {
             if (stId != null && num != null) {
 
 //                waitMap[stId]?.complete(JsonObject(mapOf("release" to JsonPrimitive(num))))
-                sendCommandToStation(stId, JsonObject(mapOf("release" to JsonPrimitive(num))))
+                sendCommandToStation(stId, JSONObject(mapOf("release" to num)))
                 call.respond(HttpStatusCode.OK, """{"status": "released"}""")
             } else {
 
@@ -281,7 +285,7 @@ fun Application.configureRouting() {
                 if (oldFileName != newFileName) {
                     fields[CMD_CHANGE_WALLPAPER] = newFileName
                     jedis.hset(key, CMD_CHANGE_WALLPAPER, newFileName)
-                    sendCommandToStation(stId,JsonObject(mapOf(CMD_CHANGE_WALLPAPER to JsonPrimitive(newFileName))))
+                    sendCommandToStation(stId,JSONObject(mapOf(CMD_CHANGE_WALLPAPER to newFileName)))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -329,6 +333,30 @@ fun Application.configureRouting() {
             setWallpaper(stId,newFileName)
 
             call.respondRedirect("/station/${stId}")
+        }
+
+        post("/api/setQR/{stId}") {
+            val stId = call.parameters["stId"]
+            try {
+
+            val QRString = call.receiveParameters()["text"]
+
+            jedisPool.resource.use { jedis ->
+                val key = "Stations:${stId}"
+                val fields = jedis.hgetAll(key)
+                val oldQr = fields[CMD_CHANGE_QR]
+                if (oldQr != QRString) {
+                    jedis.hset(key, CMD_CHANGE_QR, QRString)
+                    sendCommandToStation(stId, JSONObject(mapOf(CMD_CHANGE_QR to QRString)))
+                }
+            }
+
+
+            call.respondRedirect("/station/${stId}")
+            } catch (e: Exception) {
+                e.printStackTrace()
+                call.respondRedirect("/station/${stId}")
+            }
         }
 
 
@@ -400,7 +428,7 @@ fun Application.configureRouting() {
                     uploadLogsCallbacks[stId] = uploadFuture
 
                     // Отправляем команду на получение логов
-                    sendCommandToStation(stId, JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
+                    sendCommandToStation(stId, JSONObject(mapOf(CMD_GETLOGS to lastLogFile)))
 //                    waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
 
                     // Ожидаем загрузки логов
