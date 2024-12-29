@@ -14,6 +14,11 @@ tasks.jar {
     }
 }
 
+tasks.withType<Copy> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+
 
 
 group = "com.yellastrodev"
