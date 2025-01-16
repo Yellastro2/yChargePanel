@@ -3,6 +3,8 @@ package com.yellastrodev.ymtserial
 import java.text.SimpleDateFormat
 import java.util.*
 
+val KEY_STATION_ID = "stId"
+
 val EVENT_TYPE = "type"
 
 val EVENT_ADD_BANK = "add_bank"
@@ -33,6 +35,16 @@ val STATE_KEYS_TRAFFIC = "traffic"
 
 val ROUT_UPLOADLOGS = "uploadLogs"
 val ROUT_CHECKIN = "checkin"
+val ROUT_STATIONINFO = "stationInfo"
+val ROUT_STATIONLIST = "stationList"
+val ROUT_GET_LOGS = "getLogs"
+val ROUT_SET_QR = "setQR"
+val ROUT_UPLOAD_WALLPAPER = "upload"
+val ROUT_DOWNLOAD = "download"
+val ROUT_RELEASE = "release"
+
+val PATH_BASE = "uploads"
+val PATH_WALLPAPERS = "${PATH_BASE}/wallpapers"
 
 val CMD_RELEASE = "release"
 val CMD_GETLOGS = "getLogs"
