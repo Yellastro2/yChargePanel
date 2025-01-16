@@ -4,6 +4,21 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 val KEY_STATION_ID = "stId"
+val KEY_COMMAND = "command"
+val KEY_VALUE = "value"
+val KEY_ONLINE_STATE = "onlineState"
+val KEY_SIZE = "size"
+val KEY_STATE = "state"
+val KEY_TRAFFIC = "traffic"
+val KEY_TIMEOUT = "X-Timeout"
+val KEY_EVENT = "events"
+val KEY_TIMESTAMP = "timestamp"
+val KEY_TRAFFIC_LAST_DAY = "trafficLastDay"
+val KEY_DATE = "date"
+val KEY_NUM = "num"
+val KEY_PATH = "path"
+val KEY_TEXT = "text"
+val KEY_AVAIBLE = "available"
 
 val EVENT_TYPE = "type"
 
@@ -42,6 +57,7 @@ val ROUT_SET_QR = "setQR"
 val ROUT_UPLOAD_WALLPAPER = "upload"
 val ROUT_DOWNLOAD = "download"
 val ROUT_RELEASE = "release"
+val ROUT_STATION = "/station"
 
 val PATH_BASE = "uploads"
 val PATH_WALLPAPERS = "${PATH_BASE}/wallpapers"

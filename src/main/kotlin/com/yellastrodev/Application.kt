@@ -24,11 +24,9 @@ fun readHtml(filename: String): String {
 
 
 fun Application.module() {
-
-
-
     configureSecurity()
-    configureRouting()
+    configureWebApiRouting()
     configureWebRouting()
+    configureStationRouting()
 
 }
