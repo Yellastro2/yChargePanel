@@ -1,5 +1,6 @@
 package com.yellastrodev
 
+import com.yellastrodev.yLogger.AppLogger
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.contentnegotiation.*
@@ -10,6 +11,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 
 fun main(args: Array<String>) {
+    AppLogger.init( 1024 * 1024 * 5)
     io.ktor.server.netty.EngineMain.main(args)
 }
 

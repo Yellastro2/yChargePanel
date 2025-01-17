@@ -46,6 +46,7 @@ repositories {
 dependencies {
     implementation(libs.ktor.server.html.builder)
     implementation(libs.ktor.server.auth)
+    implementation(libs.ktor.server.auth.jwt)
     implementation("io.ktor:ktor-server-sessions:$ktor_version")
     implementation ("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 //    implementation("io.ktor:ktor-servet-content-negotiation:$ktor_version")

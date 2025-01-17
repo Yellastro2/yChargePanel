@@ -11,31 +11,87 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import redis.clients.jedis.Jedis
 import java.io.File
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
+import io.ktor.http.*
+import io.ktor.server.auth.jwt.*
+import sun.security.util.KeyUtil.validate
+import java.net.InetAddress
+import java.net.NetworkInterface
 
 
-class RedisSessionStorage(private val jedis: Jedis) : SessionStorage {
-    //            override suspend fun write(id: String, data: ByteArray) {
-//                jedis.set(id.toByteArray(), data)
-//            }
+//class RedisSessionStorage(private val jedis: Jedis) : SessionStorage {
+//    //            override suspend fun write(id: String, data: ByteArray) {
+////                jedis.set(id.toByteArray(), data)
+////            }
+//
+//    private val json = Json { prettyPrint = true }
+//
+//
+//    override suspend fun read(id: String): String {
+//        val sess = jedis.get(id.toByteArray())
+//        val sstr = sess.toString()
+//        return sstr ?: throw IllegalArgumentException("Session $id not found")
+//    }
+//
+//    override suspend fun write(id: String, value: String) {
+//        jedis.set(id, value)
+//    }
+//
+//    override suspend fun invalidate(id: String) {
+//        jedis.del(id.toByteArray()) }
+//}
 
-    private val json = Json { prettyPrint = true }
+val SECRET = "yellastrocharge"
 
 
-    override suspend fun read(id: String): String {
-        val sess = jedis.get(id.toByteArray())
-        val sstr = sess.toString()
-        return sstr ?: throw IllegalArgumentException("Session $id not found")
+fun getLocalIPAddress(): String? {
+    val interfaces = NetworkInterface.getNetworkInterfaces()
+    while (interfaces.hasMoreElements()) {
+        val iface = interfaces.nextElement()
+        val addresses = iface.inetAddresses
+        while (addresses.hasMoreElements()) {
+            val addr = addresses.nextElement()
+            if (!addr.isLoopbackAddress && addr is InetAddress) {
+                val ip = addr.hostAddress
+                if (ip.contains(".")) { // проверяем, что это IPv4 адрес
+                    return ip
+                }
+            }
+        }
     }
-
-    override suspend fun write(id: String, value: String) {
-        jedis.set(id, value)
-    }
-
-    override suspend fun invalidate(id: String) {
-        jedis.del(id.toByteArray()) }
+    return null
 }
 
+fun getIssuers(): List<String> {
+    return listOf("http://localhost:8080/",
+                 "http://${getLocalIPAddress()}:8080/",
+                 System.getenv("JWT_ISSUER") ?: "http://production-domain.com/"
+    )
+}
+
+
+
+
+fun generateToken(issuer: String): String {
+
+    return JWT.create()
+        .withIssuer(issuer)
+        .sign(Algorithm.HMAC256(SECRET))
+}
+
+
+
+
 fun Application.configureSecurity() {
+
+    val ipAddress = getLocalIPAddress()
+    println("Local IP Address: $ipAddress")
+
+    getIssuers().forEach { issuer ->
+        val token = generateToken(issuer)
+        println("Generated Token for $issuer: $token")
+    }
 
     @Serializable
     data class UserSession(val name: String, val count: Int) : Principal
@@ -81,7 +137,24 @@ fun Application.configureSecurity() {
             }
         }
 
+        // Авторизация по JWT
+        jwt("auth-jwt") {
+            val myRealm = "Access to 'api'"
 
+            verifier(
+                JWT
+                    .require(Algorithm.HMAC256(SECRET))
+                    .withIssuer(*getIssuers().toTypedArray())
+                    .build()
+            )
+
+            validate { credential ->
+                if (credential.payload.issuer in getIssuers()) JWTPrincipal(credential.payload) else null
+            }
+            challenge { _, _ ->
+                call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+            }
+        }
     }
 
     routing {
