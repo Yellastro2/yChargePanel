@@ -1,6 +1,7 @@
 package com.yellastrodev
 
 import com.yellastrodev.DatabaseManager.jedisPool
+import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.CMD_CHANGE_WALLPAPER
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -8,9 +9,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.future.await
 import org.json.JSONObject
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeoutException
 
 object CommandsManager {
+
+    val TAG = "CommandsManager"
 
     val waitMap: ConcurrentHashMap<String, CompletableFuture<JSONObject?>> = ConcurrentHashMap()
 
@@ -45,7 +49,11 @@ object CommandsManager {
             null
         } catch (e: TimeoutException) {
             null
-        } finally {
+        } catch (e: CancellationException){
+            AppLogger.info(TAG, "CancellationException cuz longpool timeout future cancelled")
+            return null
+        }
+        finally {
             waitMap.remove(stId)
         }
     }

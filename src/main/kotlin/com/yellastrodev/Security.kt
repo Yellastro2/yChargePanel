@@ -44,6 +44,8 @@ import java.net.NetworkInterface
 
 val SECRET = "yellastrocharge"
 
+val APK_STATIC_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4wLjEwMzo4MDgwLyJ9.vWxek79mWiD5LCHJtnX4D5Z18U7bRwNnF6lK-be_4TI"
+
 
 fun getLocalIPAddress(): String? {
     val interfaces = NetworkInterface.getNetworkInterfaces()
@@ -73,12 +75,12 @@ fun getIssuers(): List<String> {
 
 
 
-fun generateToken(issuer: String): String {
-
-    return JWT.create()
-        .withIssuer(issuer)
-        .sign(Algorithm.HMAC256(SECRET))
-}
+//fun generateToken(issuer: String): String {
+//
+//    return JWT.create()
+//        .withIssuer(issuer)
+//        .sign(Algorithm.HMAC256(SECRET))
+//}
 
 
 
@@ -88,10 +90,10 @@ fun Application.configureSecurity() {
     val ipAddress = getLocalIPAddress()
     println("Local IP Address: $ipAddress")
 
-    getIssuers().forEach { issuer ->
-        val token = generateToken(issuer)
-        println("Generated Token for $issuer: $token")
-    }
+//    getIssuers().forEach { issuer ->
+//        val token = generateToken(issuer)
+//        println("Generated Token for $issuer: $token")
+//    }
 
     @Serializable
     data class UserSession(val name: String, val count: Int) : Principal
@@ -137,24 +139,35 @@ fun Application.configureSecurity() {
             }
         }
 
-        // Авторизация по JWT
-        jwt("auth-jwt") {
-            val myRealm = "Access to 'api'"
-
-            verifier(
-                JWT
-                    .require(Algorithm.HMAC256(SECRET))
-                    .withIssuer(*getIssuers().toTypedArray())
-                    .build()
-            )
-
-            validate { credential ->
-                if (credential.payload.issuer in getIssuers()) JWTPrincipal(credential.payload) else null
-            }
-            challenge { _, _ ->
-                call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+        bearer("auth-apk-static") {
+            authenticate { credentials  ->
+                // Проверяем, совпадает ли токен с нашим статическим ключом
+                if (credentials.token == APK_STATIC_TOKEN) {
+                    UserIdPrincipal("api-client") // Указываем имя пользователя или роль
+                } else {
+                    null // Возвращаем null, если ключ недействителен
+                }
             }
         }
+
+        // Авторизация по JWT
+//        jwt("auth-jwt") {
+//            val myRealm = "Access to 'api'"
+//
+//            verifier(
+//                JWT
+//                    .require(Algorithm.HMAC256(SECRET))
+//                    .withIssuer(*getIssuers().toTypedArray())
+//                    .build()
+//            )
+//
+//            validate { credential ->
+//                if (credential.payload.issuer in getIssuers()) JWTPrincipal(credential.payload) else null
+//            }
+//            challenge { _, _ ->
+//                call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+//            }
+//        }
     }
 
     routing {

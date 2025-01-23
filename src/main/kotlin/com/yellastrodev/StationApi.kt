@@ -28,7 +28,7 @@ fun Application.configureStationRouting() {
     }
 
     routing {
-        authenticate("auth-jwt") {
+        authenticate("auth-apk-static") {
             route("/stationApi") {
                 get("/$ROUT_CHECKIN") {
                     val jedis = jedisPool.resource
@@ -39,11 +39,9 @@ fun Application.configureStationRouting() {
                         val timeoutHeader = call.request.headers[KEY_TIMEOUT]?.toIntOrNull()
                         val trafficLastDay = call.request.queryParameters[KEY_TRAFFIC]
                         val events = call.request.queryParameters[KEY_EVENT]
-                        print(trafficLastDay)
 
                         if (stId != null && timeoutHeader != null) {
                             val timestamp = System.currentTimeMillis() / 1000
-
                             AppLogger.info(TAG, "Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
 
                             val key = "Stations:${stId}"
@@ -57,6 +55,7 @@ fun Application.configureStationRouting() {
 
                             events?.let {
                                 // тут чекаем как эвенты меняют стейт станции.
+                                AppLogger.info(TAG,"find events: $events")
 
                                 // упорядочиваем к самым новым
                                 val fEventsSort = JSONArray(it).sortedBy {
@@ -112,12 +111,14 @@ fun Application.configureStationRouting() {
 
                                 if (stateStringPrevius != stateJSON.toString()) {
                                     state = stateJSON.toString()
-                                    print("NEW EVENT RECEIVED")
+                                    AppLogger.info(TAG,"NEW EVENT RECEIVED")
                                 }
                                 //TODO
                             }
 
                             var onlineState: JSONObject = JSONObject()
+
+                            AppLogger.info(TAG, "update state: $state")
 
                             state?.let {
                                 value[KEY_STATE] = it

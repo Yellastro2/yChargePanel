@@ -10,7 +10,7 @@ class Logger(private val maxFileSize: Long = 1024 * 1024) { // 1 MB по умо�
 
     companion object {
         const val BASE_LOG_FILENAME = "app.log"
-        val logFileDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val logFileDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     }
 
     var logFile = File(BASE_LOG_FILENAME)
@@ -56,12 +56,13 @@ class Logger(private val maxFileSize: Long = 1024 * 1024) { // 1 MB по умо�
 
     private fun logToConsole(time: String, level: String, tag: String, message: String, e: Exception? = null) {
         
-        System.out.println("Debug: null fluscher")
+//        System.out.println("Debug: null fluscher")
+        val timestamp = time ?: "Unknown time"
         when (level) {
-            "INFO" -> print("$time INFO: $tag: $message")
-            "WARN" -> print("$time WARN: $tag: $message")
-            "ERROR" -> e?.let { print("$time ERROR: $tag: $message\n${it.stackTraceToString()}") } ?: print("$time ERROR: $tag: $message")
-            else -> print("$time DEBUG: $tag: $message")
+            "INFO" -> println("$timestamp INFO: $tag: $message")
+            "WARN" -> println("$timestamp WARN: $tag: $message")
+            "ERROR" -> e?.let { println("$timestamp ERROR: $tag: $message\n${it.stackTraceToString()}") } ?: print("$time ERROR: $tag: $message")
+            else -> println("$timestamp DEBUG: $tag: $message")
         }
     }
 
