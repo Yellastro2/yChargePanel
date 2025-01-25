@@ -2,6 +2,7 @@ package com.yellastrodev
 
 import com.yellastrodev.yLogger.AppLogger
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.Table.Dual.columns
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.json.JSONArray
 import org.json.JSONObject // Импортируем JSONObject, если используете библиотеку org.json
@@ -18,21 +19,11 @@ object Stations : Table() {
     val wallpaper = text("wallpaper").default("") // Новое поле для wallpaper
 }
 
-// Определение класса Station
-data class Station(
-    val stId: String,
-    var size: Int = 0,
-    var lastDayTraffic: String = "",
-    var state: JSONObject = JSONObject(), // Используем JSONObject для хранения состояния
-    val events: ArrayList<JSONObject> = ArrayList(), // Список событий
-    val timestamp: Int = 0,
-    var qrString: String = "", // Новое поле для qrString
-    var wallpaper: String = "" // Новое поле для wallpaper
-)
 
 
 
-class PostgreeManager {
+
+class PostgreeManager: DbManager {
     private val TAG = "PostgreeManager"
 
     private val url3 = "jdbc:postgresql://aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
@@ -53,10 +44,10 @@ class PostgreeManager {
         }
     }
 
-    fun updateStation(station: Station) {
+    override fun updateStation(station: Station) {
         transaction {
             // Проверяем, существует ли станция с таким stId
-            val existingStation = Stations.selectAll().where { Stations.stId eq station.stId }.singleOrNull()
+            val existingStation = Stations.select(Stations.stId).where { Stations.stId eq station.stId }.singleOrNull()
 
             if (existingStation != null) {
                 // Если станция существует, обновляем ее
@@ -85,9 +76,13 @@ class PostgreeManager {
         }
     }
 
-    fun getStationById(stId: String): Station? {
+    override fun getStationById(stId: String): Station? {
         return transaction {
             // Используем find для поиска записи по stId
+//            Stations.select(Stations.stId, *columns.toTypedArray())
+//                .where { Stations.stId eq stId }.singleOrNull()?.let { row ->
+
+
             Stations.selectAll().where { Stations.stId eq stId }.singleOrNull()?.let { row ->
                 // Преобразуем результат в объект Station
                 val events = if (row[Stations.events].isBlank()) {
@@ -115,7 +110,7 @@ class PostgreeManager {
         }
     }
 
-    fun getStations(limit: Int = 20, offset: Int = 0): List<Station> {
+    override fun getStations(limit: Int, offset: Int): List<Station> {
         return transaction {
             Stations.selectAll()
                 .limit(limit, offset.toLong())

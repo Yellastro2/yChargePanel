@@ -10,7 +10,7 @@ class Logger(private val maxFileSize: Long = 1024 * 1024) { // 1 MB по умо�
 
     companion object {
         const val BASE_LOG_FILENAME = "app.log"
-        val logFileDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val logFileDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSS", Locale.getDefault())
     }
 
     var logFile = File(BASE_LOG_FILENAME)
@@ -61,7 +61,7 @@ class Logger(private val maxFileSize: Long = 1024 * 1024) { // 1 MB по умо�
         when (level) {
             "INFO" -> println("$timestamp INFO: $tag: $message")
             "WARN" -> println("$timestamp WARN: $tag: $message")
-            "ERROR" -> e?.let { println("$timestamp ERROR: $tag: $message\n${it.stackTraceToString()}") } ?: print("$time ERROR: $tag: $message")
+            "ERROR" -> e?.let { println("$timestamp ERROR: $tag: $message\n${it.stackTraceToString()}") } ?: println("$time ERROR: $tag: $message")
             else -> println("$timestamp DEBUG: $tag: $message")
         }
     }

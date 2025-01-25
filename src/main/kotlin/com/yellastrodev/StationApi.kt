@@ -1,7 +1,6 @@
 package com.yellastrodev
 
 import com.yellastrodev.CommandsManager.waitForEventOrTimeout
-import com.yellastrodev.DatabaseManager.jedisPool
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
@@ -12,7 +11,7 @@ import io.ktor.server.routing.*
 import org.json.JSONArray
 import org.json.JSONObject
 
-val database = PostgreeManager()
+
 
 fun Application.configureStationRouting() {
 
@@ -47,15 +46,21 @@ fun Application.configureStationRouting() {
 
                         if (stId != null && timeoutHeader != null) {
                             val timestamp = System.currentTimeMillis() / 1000
-                            AppLogger.info(TAG, "Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
+//                            AppLogger.info(TAG, "Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
 
                             var isUpdated = false
-                            val fStation = database.getStationById(stId) ?: run {
+                            val fStation = try {
+                                 database.getStationById(stId) ?: run {
                                 isUpdated = true
                                 Station(
                                     stId,
                                     timestamp = timestamp.toInt()
                                 )
+                            }
+                            } catch (e: Exception) {
+                                AppLogger.error(TAG, "${e.message} on $stId")
+                                call.response.status(HttpStatusCode.InternalServerError)
+                                return@get
                             }
 
                             size?.let {
@@ -66,14 +71,6 @@ fun Application.configureStationRouting() {
 
                             }
 
-
-//                            val key = "Stations:${stId}"
-//                            val value = hashMapOf(
-//                                KEY_STATION_ID to stId,
-//                                KEY_TIMESTAMP to timestamp.toString()
-//                            )
-//                            size?.let { value[KEY_SIZE] = it.toString() }
-//
                             trafficLastDay?.let {
                                 fStation.lastDayTraffic = it
                                 isUpdated = true
@@ -88,24 +85,10 @@ fun Application.configureStationRouting() {
                                     (it as JSONObject).getInt(KEY_DATE)
                                 } as List<JSONObject>
 
-
-//                                val fields = HashMap<String, String>() // jedis.hgetAll(key)
-//                                var fSavedEventsStr = fields[KEY_EVENT] ?: "[]"
-//                                if (fSavedEventsStr == "")
-//                                    fSavedEventsStr = "[]"
-//                                val fPreviusEvents = JSONArray(fSavedEventsStr)
-
                                 // достаем стейт банков (список банков индексированый по слотам)
                                 // либо он был передан в запросе со станции, либо берем из базы
                                 val stateJSON = state?.let { JSONObject(it) } ?: run {
                                     fStation.state
-//                                    if (jedis.type(key) != "hash") {
-//                                        jedis.del(key)
-//                                        return@run JSONObject()
-//                                    }
-//                                    fields[KEY_STATE]?.let { itStateFromRedis ->
-//                                        JSONObject(itStateFromRedis)
-//                                    } ?: JSONObject()
                                 }
 
                                 // сохраняем строковый отпечаток стейта для дальше сравнения
@@ -148,10 +131,7 @@ fun Application.configureStationRouting() {
 
                             var onlineState: JSONObject = JSONObject()
 
-                            AppLogger.info(TAG, "update state: $state")
-
                             state?.let {
-//                                value[KEY_STATE] = it
                                 if (fStation.state.toString() != it) {
                                     isUpdated = true
                                     fStation.state = JSONObject(it)
@@ -166,26 +146,20 @@ fun Application.configureStationRouting() {
                                     onlineState.put(CMD_CHANGE_QR, stateJSON.get(CMD_CHANGE_QR))
                             }
 
-
-
-                            AppLogger.info(TAG,"some ${fStation.state}")
-
-                            // Проверка типа данных ключа
-//                            if (jedis.type(key) != "hash") {
-//                                jedis.del(key) // Удаление ключа, если тип данных отличается
-//                            }
-//
-                            val exists = false // jedis.exists(key)
+                            val exists = false
                             if (isUpdated)
-                                database.updateStation(fStation)
-//                            jedis.hmset(key, value)
-//                            jedis.close()
+                                try {
+                                    database.updateStation(fStation)
+                                } catch (e: Exception) {
+                                    AppLogger.error(TAG, "${e.message} on UPDATE $stId")
+                                    call.response.status(HttpStatusCode.InternalServerError)
+                                    return@get
+                                }
 
                             val newEvent = waitForEventOrTimeout(stId, timeoutHeader)
 
                             val response = if (newEvent != null) {
                                 createCommanJson(newEvent)
-//                        JsonObject(mapOf(KEY_COMMAND to JsonPrimitive("pong"), "code" to JsonPrimitive(200)))
                             } else {
                                 JSONObject(mapOf(KEY_COMMAND to "pong", "code" to 200))
                             }

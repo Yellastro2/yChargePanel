@@ -35,7 +35,7 @@ object CommandsManager {
     suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JSONObject? {
         val future = waitMap.computeIfAbsent(stId) { CompletableFuture<JSONObject?>() }
         return try {
-            withTimeoutOrNull((if (timeout > 5) timeout - 5 else 0).toLong() * 1000) {
+            withTimeoutOrNull((if (timeout > 10) timeout - 5 else 0).toLong() * 1000) {
                 future.await()
             }
         } catch (e: TimeoutCancellationException) {
