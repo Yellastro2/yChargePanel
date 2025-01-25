@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.exposed.dao)
     implementation(libs.exposed.jdbc)
     implementation(libs.postgresql)
+    implementation("com.zaxxer:HikariCP:5.0.0")
+
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 }

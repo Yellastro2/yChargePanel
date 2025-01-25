@@ -1,6 +1,8 @@
 package com.yellastrodev
 
 import com.yellastrodev.yLogger.AppLogger
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.Table.Dual.columns
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -26,17 +28,43 @@ object Stations : Table() {
 class PostgreeManager: DbManager {
     private val TAG = "PostgreeManager"
 
-    private val url3 = "jdbc:postgresql://aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
+    private val url3 = "jdbc:postgresql://aws-0-eu-central-1.pooler.supabase.com:6543/postgres?prepareThreshold=0"
 
-    private val password = "7821493402Ss"
+    private val user = "postgres.wqfqhszmsmsyvhjsgjuz"
+    private val ypassword = "7821493402Ss"
+    private val hikariDataSource: HikariDataSource
+    private val driver = "org.postgresql.Driver"
+
 
     init {
-        Database.connect(
-            url3,
-            driver = "org.postgresql.Driver",
-            user = "postgres.wqfqhszmsmsyvhjsgjuz",
-            password = password
-        )
+
+        // Настройка конфигурации пула
+        val hikariConfig = HikariConfig().apply {
+            jdbcUrl = url3
+            username = user
+            password = ypassword
+            driverClassName = driver
+            maximumPoolSize = 50  // Максимальное количество подключений в пуле
+            isAutoCommit = false  // Отключаем автокоммит
+            connectionTimeout = 8000 // Максимальное время ожидания подключения
+        }
+
+        // Отключаем использование подготовленных запросов и их кэширование
+//        hikariConfig.addDataSourceProperty("useServerPrepStmts", false)
+//        hikariConfig.addDataSourceProperty("cachePrepStmts", false)
+//        hikariConfig.addDataSourceProperty("prepStmtCacheSize", 250)
+//        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048")
+
+        // Создание DataSource с использованием конфигурации
+        hikariDataSource = HikariDataSource(hikariConfig)
+
+        Database.connect(hikariDataSource)
+//        Database.connect(
+//            url3,
+//            driver = "org.postgresql.Driver",
+//            user = "postgres.wqfqhszmsmsyvhjsgjuz",
+//            password = password
+//        )
 
         transaction {
             // Создание таблицы, если она не существует
