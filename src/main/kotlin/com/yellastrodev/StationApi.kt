@@ -12,11 +12,15 @@ import io.ktor.server.routing.*
 import org.json.JSONArray
 import org.json.JSONObject
 
+val database = PostgreeManager()
+
 fun Application.configureStationRouting() {
 
     val TAG = "StationApi"
 
     val MAX_EVENTS_SIZE = 100
+
+
 
 
     fun createCommanJson(fComand: JSONObject): JSONObject {
@@ -31,10 +35,11 @@ fun Application.configureStationRouting() {
         authenticate("auth-apk-static") {
             route("/stationApi") {
                 get("/$ROUT_CHECKIN") {
-                    val jedis = jedisPool.resource
+//                    val jedis = jedisPool.resource
                     try {
+                        AppLogger.debug(TAG, "Checkin ${call.request.rawQueryParameters}")
                         val stId = call.request.queryParameters[KEY_STATION_ID]
-                        val size = call.request.queryParameters[KEY_SIZE]?.toIntOrNull()
+                        val size = call.request.queryParameters[KEY_SIZE]?.toInt()
                         var state = call.request.queryParameters[KEY_STATE]
                         val timeoutHeader = call.request.headers[KEY_TIMEOUT]?.toIntOrNull()
                         val trafficLastDay = call.request.queryParameters[KEY_TRAFFIC]
@@ -44,14 +49,35 @@ fun Application.configureStationRouting() {
                             val timestamp = System.currentTimeMillis() / 1000
                             AppLogger.info(TAG, "Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
 
-                            val key = "Stations:${stId}"
-                            val value = hashMapOf(
-                                KEY_STATION_ID to stId,
-                                KEY_TIMESTAMP to timestamp.toString()
-                            )
-                            size?.let { value[KEY_SIZE] = it.toString() }
+                            var isUpdated = false
+                            val fStation = database.getStationById(stId) ?: run {
+                                isUpdated = true
+                                Station(
+                                    stId,
+                                    timestamp = timestamp.toInt()
+                                )
+                            }
 
-                            trafficLastDay?.let { value[KEY_TRAFFIC_LAST_DAY] = it }
+                            size?.let {
+                                if (fStation.size != it) {
+                                    isUpdated = true
+                                    fStation.size = it
+                                }
+
+                            }
+
+
+//                            val key = "Stations:${stId}"
+//                            val value = hashMapOf(
+//                                KEY_STATION_ID to stId,
+//                                KEY_TIMESTAMP to timestamp.toString()
+//                            )
+//                            size?.let { value[KEY_SIZE] = it.toString() }
+//
+                            trafficLastDay?.let {
+                                fStation.lastDayTraffic = it
+                                isUpdated = true
+                            }
 
                             events?.let {
                                 // тут чекаем как эвенты меняют стейт станции.
@@ -62,23 +88,24 @@ fun Application.configureStationRouting() {
                                     (it as JSONObject).getInt(KEY_DATE)
                                 } as List<JSONObject>
 
-                                // достаем сохраненный в базе список эвентов, что бы добавить в него новые.
-                                val fields = jedis.hgetAll(key)
-                                var fSavedEventsStr = fields[KEY_EVENT] ?: "[]"
-                                if (fSavedEventsStr == "")
-                                    fSavedEventsStr = "[]"
-                                val fPreviusEvents = JSONArray(fSavedEventsStr)
+
+//                                val fields = HashMap<String, String>() // jedis.hgetAll(key)
+//                                var fSavedEventsStr = fields[KEY_EVENT] ?: "[]"
+//                                if (fSavedEventsStr == "")
+//                                    fSavedEventsStr = "[]"
+//                                val fPreviusEvents = JSONArray(fSavedEventsStr)
 
                                 // достаем стейт банков (список банков индексированый по слотам)
                                 // либо он был передан в запросе со станции, либо берем из базы
                                 val stateJSON = state?.let { JSONObject(it) } ?: run {
-                                    if (jedis.type(key) != "hash") {
-                                        jedis.del(key)
-                                        return@run JSONObject()
-                                    }
-                                    fields[KEY_STATE]?.let { itStateFromRedis ->
-                                        JSONObject(itStateFromRedis)
-                                    } ?: JSONObject()
+                                    fStation.state
+//                                    if (jedis.type(key) != "hash") {
+//                                        jedis.del(key)
+//                                        return@run JSONObject()
+//                                    }
+//                                    fields[KEY_STATE]?.let { itStateFromRedis ->
+//                                        JSONObject(itStateFromRedis)
+//                                    } ?: JSONObject()
                                 }
 
                                 // сохраняем строковый отпечаток стейта для дальше сравнения
@@ -86,7 +113,9 @@ fun Application.configureStationRouting() {
 
                                 // каждый эвент: 1. сохраняем в список всех последних эвентов
                                 fEventsSort.forEach { qEvent ->
-                                    fPreviusEvents.put(qEvent)
+//                                    fPreviusEvents.put(qEvent)
+
+                                    fStation.events.add(qEvent)
                                     // слот айди значит эвент касается банка, будет влиять на стейт, разбираемся чо за эвент
                                     if (qEvent.has(EVENT_SLOT_ID)) {
                                         val qSlot = qEvent.getString(EVENT_SLOT_ID)
@@ -104,14 +133,15 @@ fun Application.configureStationRouting() {
                                     }
                                 }
 
-                                while (fPreviusEvents.length() > MAX_EVENTS_SIZE)
-                                    fPreviusEvents.remove(0)
+                                while (fStation.events.size > MAX_EVENTS_SIZE)
+                                    fStation.events.removeAt(0)
 
-                                value[KEY_EVENT] = JSONArray(fPreviusEvents).toString()
+//                                value[KEY_EVENT] = JSONArray(fPreviusEvents).toString()
 
                                 if (stateStringPrevius != stateJSON.toString()) {
                                     state = stateJSON.toString()
                                     AppLogger.info(TAG,"NEW EVENT RECEIVED")
+                                    isUpdated = true
                                 }
                                 //TODO
                             }
@@ -121,8 +151,12 @@ fun Application.configureStationRouting() {
                             AppLogger.info(TAG, "update state: $state")
 
                             state?.let {
-                                value[KEY_STATE] = it
-                                val fields = jedis.hgetAll(key)
+//                                value[KEY_STATE] = it
+                                if (fStation.state.toString() != it) {
+                                    isUpdated = true
+                                    fStation.state = JSONObject(it)
+                                }
+                                val fields = "{}" //jedis.hgetAll(key) TODO
                                 val stateJSON = JSONObject(fields)
                                 if (stateJSON.has(CMD_CHANGE_WALLPAPER))
                                     onlineState = JSONObject(
@@ -133,13 +167,19 @@ fun Application.configureStationRouting() {
                             }
 
 
-                            // Проверка типа данных ключа
-                            if (jedis.type(key) != "hash") {
-                                jedis.del(key) // Удаление ключа, если тип данных отличается
-                            }
 
-                            val exists = jedis.exists(key)
-                            jedis.hmset(key, value)
+                            AppLogger.info(TAG,"some ${fStation.state}")
+
+                            // Проверка типа данных ключа
+//                            if (jedis.type(key) != "hash") {
+//                                jedis.del(key) // Удаление ключа, если тип данных отличается
+//                            }
+//
+                            val exists = false // jedis.exists(key)
+                            if (isUpdated)
+                                database.updateStation(fStation)
+//                            jedis.hmset(key, value)
+//                            jedis.close()
 
                             val newEvent = waitForEventOrTimeout(stId, timeoutHeader)
 
@@ -161,6 +201,8 @@ fun Application.configureStationRouting() {
                                 resp = "Station updated: ${stId}"
                             }
 
+                            AppLogger.info(TAG,"send responce to $stId: $response")
+
                             call.respond(HttpStatusCode.OK, response.toString())
                         } else {
                             AppLogger.warn(TAG,"Missing or invalid query parameters")
@@ -170,7 +212,7 @@ fun Application.configureStationRouting() {
                     } catch (e: Exception) {
                         e.printStackTrace()
                     } finally {
-                        jedis.close()
+//                        jedis.close()
                     }
                 }
             }

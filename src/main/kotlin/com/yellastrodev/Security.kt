@@ -100,8 +100,8 @@ fun Application.configureSecurity() {
 
     install(Sessions) {
 
-        val jedis = Jedis("redis-12703.c327.europe-west1-2.gce.redns.redis-cloud.com", 12703)
-        jedis.auth("XUqovunbShd12asbuLVoZeYf63DfJNPq")
+//        val jedis = Jedis("redis-12703.c327.europe-west1-2.gce.redns.redis-cloud.com", 12703)
+//        jedis.auth("XUqovunbShd12asbuLVoZeYf63DfJNPq")
 
         cookie<UserSession>("SESSION", storage = directorySessionStorage(File("build/.sessions"))){
             cookie.path = "/"

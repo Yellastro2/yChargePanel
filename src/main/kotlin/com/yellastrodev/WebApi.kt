@@ -3,7 +3,6 @@ package com.yellastrodev
 import com.yellastrodev.CommandsManager.isClientConnected
 import com.yellastrodev.CommandsManager.sendCommandToStation
 import com.yellastrodev.CommandsManager.setWallpaper
-import com.yellastrodev.DatabaseManager.jedisPool
 import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -25,8 +24,7 @@ import org.json.JSONObject
 import java.io.*
 import java.util.concurrent.CompletableFuture
 
-@Serializable
-data class Station(val id: String, val name: String)
+
 
 @Serializable
 data class CheckinData(val stId: String, val size: Int, val state: String)
@@ -107,14 +105,49 @@ fun Application.configureWebApiRouting() {
                 call.respondRedirect("/station/${stId}")
             }
 
+            suspend fun extractParametersOrFail(
+                parameters: Parameters,
+                keys: List<String>,
+                onError: suspend (String) -> Unit
+            ): Map<String, String>? {
+                val resultMap = mutableMapOf<String, String>()
+                val missingKeys = mutableListOf<String>()
+
+                for (key in keys) {
+                    val value = parameters[key]
+                    if (value == null) {
+                        missingKeys.add(key)
+                    } else {
+                        resultMap[key] = value
+                    }
+                }
+
+                if (missingKeys.isNotEmpty()) {
+                    onError("Missing parameters: ${missingKeys.joinToString(", ")}")
+                    return null
+                }
+
+                return resultMap
+            }
+
+
 
 
             post("/$ROUT_SET_QR/{stId}") {
-                val stId = call.parameters[KEY_STATION_ID]
+                val params = extractParametersOrFail(call.parameters, listOf(KEY_STATION_ID)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@post
+
+
                 try {
+                    val stId = params[KEY_STATION_ID]!!
+                    val QRString = params[KEY_TEXT]!!
 
-                    val QRString = call.receiveParameters()[KEY_TEXT]
+                    val fStation = database.getStationById(stId)
+                        ?: return@post call.respondText("Station with ID $stId not found.", status = HttpStatusCode.NotFound)
 
+                    fStation.qrString = QRString
+                    database.updateStation(fStation)
                     jedisPool.resource.use { jedis ->
                         val key = "Stations:${stId}"
                         val fields = jedis.hgetAll(key)
