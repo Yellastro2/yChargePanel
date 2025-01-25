@@ -1,10 +1,46 @@
 package com.yellastrodev
 
 import com.yellastrodev.ymtserial.logFileDateFormat
+import io.ktor.http.*
+import io.ktor.server.request.*
+import io.ktor.server.routing.*
 import java.io.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+
+suspend fun extractParametersOrFail(
+    call: RoutingCall,
+    keys: List<String>,
+    onError: suspend (String) -> Unit
+): Map<String, String>? {
+    val resultMap = mutableMapOf<String, String>()
+    val missingKeys = mutableListOf<String>()
+
+    val parameters = call.request.queryParameters
+    val routParameters = call.parameters
+    val recieveParams = if (call.request.httpMethod == HttpMethod.Post) {
+        call.receiveParameters()
+    } else {
+        Parameters.Empty // Или можно просто пустой объект, если нет тела в запросе
+    }
+
+    for (key in keys) {
+        val value = parameters[key] ?: routParameters[key] ?: recieveParams[key]
+        if (value == null) {
+            missingKeys.add(key)
+        } else {
+            resultMap[key] = value
+        }
+    }
+
+    if (missingKeys.isNotEmpty()) {
+        onError("Missing parameters: ${missingKeys.joinToString(", ")}")
+        return null
+    }
+
+    return resultMap
+}
 
 fun extractZip(zipFile: File, outputDir: File) {
     if (!outputDir.exists()) {

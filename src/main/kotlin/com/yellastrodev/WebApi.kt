@@ -47,17 +47,15 @@ fun Application.configureWebApiRouting() {
     routing {
         route("/api") {
             get("/$ROUT_RELEASE") {
-                val stId = call.request.queryParameters[KEY_STATION_ID]
-                val num = call.request.queryParameters[KEY_NUM]
-                if (stId != null && num != null) {
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID,KEY_NUM)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@get
 
-//                waitMap[stId]?.complete(JsonObject(mapOf("release" to JsonPrimitive(num))))
-                    sendCommandToStation(stId, JSONObject(mapOf(CMD_RELEASE to num)))
-                    call.respond(HttpStatusCode.OK, """{"status": "released"}""")
-                } else {
+                val stId = params[KEY_STATION_ID]!!
+                val num = params[KEY_NUM]!!
 
-                    call.respond(HttpStatusCode.BadRequest, "Invalid or missing $KEY_STATION_ID or $KEY_NUM parameter")
-                }
+                sendCommandToStation(stId, JSONObject(mapOf(CMD_RELEASE to num)))
+                call.respond(HttpStatusCode.OK, """{"status": "released"}""")
             }
 
 
@@ -65,21 +63,23 @@ fun Application.configureWebApiRouting() {
 
 
             get("/$ROUT_DOWNLOAD") {
-                val filePath = call.request.queryParameters[KEY_PATH]
-                if (filePath != null) {
-                    val file = File("$PATH_BASE/$filePath")
-                    if (file.exists()) {
-                        call.respondFile(file)
-                    } else {
-                        call.respond(HttpStatusCode.NotFound, "Файл не найден")
-                    }
+                val params = extractParametersOrFail(call, listOf(KEY_PATH)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@get
+                val filePath = params[KEY_PATH]!!
+                val file = File("$PATH_BASE/$filePath")
+                if (file.exists()) {
+                    call.respondFile(file)
                 } else {
-                    call.respond(HttpStatusCode.BadRequest, "Параметр 'path' отсутствует")
+                    call.respond(HttpStatusCode.NotFound, "Файл не найден")
                 }
             }
 
             post("/$ROUT_UPLOAD_WALLPAPER/{$KEY_STATION_ID}") {
-                val stId = call.parameters[KEY_STATION_ID]
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@post
+                val stId = params[KEY_STATION_ID]!!
                 val uploadDir = File(PATH_WALLPAPERS)
                 if (!uploadDir.exists()) {
                     uploadDir.mkdirs()
@@ -105,61 +105,32 @@ fun Application.configureWebApiRouting() {
                 call.respondRedirect("/station/${stId}")
             }
 
-            suspend fun extractParametersOrFail(
-                parameters: Parameters,
-                keys: List<String>,
-                onError: suspend (String) -> Unit
-            ): Map<String, String>? {
-                val resultMap = mutableMapOf<String, String>()
-                val missingKeys = mutableListOf<String>()
 
-                for (key in keys) {
-                    val value = parameters[key]
-                    if (value == null) {
-                        missingKeys.add(key)
-                    } else {
-                        resultMap[key] = value
-                    }
-                }
-
-                if (missingKeys.isNotEmpty()) {
-                    onError("Missing parameters: ${missingKeys.joinToString(", ")}")
-                    return null
-                }
-
-                return resultMap
-            }
 
 
 
 
             post("/$ROUT_SET_QR/{stId}") {
-                val params = extractParametersOrFail(call.parameters, listOf(KEY_STATION_ID)) { errorMessage ->
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID,KEY_TEXT)) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
                 } ?: return@post
-
+                val stId = params[KEY_STATION_ID]!!
 
                 try {
-                    val stId = params[KEY_STATION_ID]!!
+
                     val QRString = params[KEY_TEXT]!!
 
                     val fStation = database.getStationById(stId)
                         ?: return@post call.respondText("Station with ID $stId not found.", status = HttpStatusCode.NotFound)
 
-                    fStation.qrString = QRString
-                    database.updateStation(fStation)
-                    jedisPool.resource.use { jedis ->
-                        val key = "Stations:${stId}"
-                        val fields = jedis.hgetAll(key)
-                        val oldQr = fields[CMD_CHANGE_QR]
-                        if (oldQr != QRString) {
-                            jedis.hset(key, CMD_CHANGE_QR, QRString)
-                            sendCommandToStation(stId, JSONObject(mapOf(CMD_CHANGE_QR to QRString)))
-                        }
+                    if (fStation.qrString != QRString) {
+                        fStation.qrString = QRString
+                        database.updateStation(fStation)
+                        sendCommandToStation(stId, JSONObject(mapOf(CMD_CHANGE_QR to QRString)))
                     }
 
 
-                    call.respondRedirect("ROUT_STATION/${stId}")
+                    call.respondRedirect("$ROUT_STATION/${stId}")
                 } catch (e: Exception) {
                     e.printStackTrace()
                     call.respondRedirect("$ROUT_STATION/${stId}")
@@ -169,7 +140,11 @@ fun Application.configureWebApiRouting() {
 
 
             get("/$ROUT_GET_LOGS") {
-                val stId = call.request.queryParameters[KEY_STATION_ID]
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@get
+
+                val stId = params[KEY_STATION_ID]!!
                 val uploadDir = File("${PATH_LOGFILES}/${stId}")
                 val lastLogFile = findLatestLogFile(uploadDir)?.name ?: "0"
                 if (stId != null) {
@@ -211,93 +186,62 @@ fun Application.configureWebApiRouting() {
             }
 
             get("/$ROUT_STATIONLIST") {
-                val jedis = jedisPool.resource
                 try {
-                    val pattern = "Stations:*"
+                    val fStations = database.getStations()
 
-                    val keys = jedis.keys(pattern)
-
-                    val jsonArray = JsonArray(keys.mapNotNull { key ->
-                        if (jedis.type(key) != "hash") {
-                            jedis.del(key) // Удаление ключа, если тип данных отличается
-                            null
-                        } else {
-                            val fields = jedis.hgetAll(key)
-                            val stId = fields[KEY_STATION_ID]
-                            val size = fields[KEY_SIZE]?.toIntOrNull()
-                            val available = fields[KEY_STATE]?.let { Json.parseToJsonElement(it).jsonObject.size } ?: null
-                            val timestamp = fields[KEY_TIMESTAMP]?.toLongOrNull()
-                            val trafficLastDay = fields[KEY_TRAFFIC_LAST_DAY]
-
-                            if (stId != null && size != null && available != null && timestamp != null) {
-                                JsonObject(
-                                    mapOf(
-                                        KEY_STATION_ID to JsonPrimitive(stId),
-                                        KEY_SIZE to JsonPrimitive(size),
-                                        KEY_AVAIBLE to JsonPrimitive(available),
-                                        KEY_TIMESTAMP to JsonPrimitive(timestamp),
-                                        KEY_TRAFFIC_LAST_DAY to JsonPrimitive(trafficLastDay)
-                                    )
-                                )
-                            } else {
-                                null
+                    val jsonArray = JSONArray().apply {
+                        fStations.forEach { station ->
+                            // Создаем JSONObject прямо из полей объекта Station
+                            val jsonObject = JSONObject().apply {
+                                put(KEY_STATION_ID, station.stId)
+                                put(KEY_SIZE, station.size)
+                                put(KEY_AVAIBLE, station.state.length())  // Количество полей в state
+                                put(KEY_TIMESTAMP, station.timestamp)
+                                put(KEY_TRAFFIC_LAST_DAY, station.lastDayTraffic)
                             }
+                            this.put(jsonObject) // Добавляем объект в JSONArray
                         }
-                    })
+                    }
 
                     call.respond(HttpStatusCode.OK, jsonArray.toString())
                 } catch (e: Exception) {
                     e.printStackTrace()
-                } finally {
-                    jedis.close()
                 }
 
             }
 
             get("/$ROUT_STATIONINFO") {
-                val jedis = jedisPool.resource
                 try {
-                    val stId = call.parameters[KEY_STATION_ID]
-                    val key = "Stations:${stId}"
+                    val params = extractParametersOrFail(call, listOf(KEY_STATION_ID)) { errorMessage ->
+                        call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                    } ?: return@get
 
-//                val key = jedis.keys(pattern)
+                    val stId = params[KEY_STATION_ID]!!
 
-//                val jsonArray = JsonArray(keys.mapNotNull { key ->
-                    if (jedis.type(key) != "hash") {
-                        jedis.del(key) // Удаление ключа, если тип данных отличается
-                        call.respond(HttpStatusCode.OK, "station ${stId} not found")
-                    } else {
-                        val fields = jedis.hgetAll(key)
-                        val stId = fields[KEY_STATION_ID]
-                        val size = fields[KEY_SIZE]?.toIntOrNull()
-                        val state = fields[KEY_STATE]?.let { JSONObject(it) }
-                        val timestamp = fields[KEY_TIMESTAMP]?.toLongOrNull()
-                        val trafficLastDay = fields[KEY_TRAFFIC_LAST_DAY]
-                        
-                        if (stId != null && size != null && state != null && timestamp != null) {
-                            val fStationJson = JSONObject(
-                                mapOf(
-                                    KEY_STATION_ID to stId,
-                                    KEY_SIZE to size,
-                                    KEY_STATE to state,
-                                    KEY_TIMESTAMP to timestamp,
-                                    KEY_TRAFFIC_LAST_DAY to trafficLastDay
-                                )
-                            )
-                            fields[KEY_EVENT]?.let {
-                                fStationJson.put(KEY_EVENT, JSONArray(if (it != "") it else "[]"))
-                            }
-                            call.respond(HttpStatusCode.OK, fStationJson.toString())
+                    val fStation = database.getStationById(stId)
+                        ?: return@get call.respondText("Station with ID $stId not found.", status = HttpStatusCode.NotFound)
+
+                    // Создаем JSONObject напрямую из данных fStation
+                    val fStationJson = JSONObject().apply {
+                        put(KEY_STATION_ID, fStation.stId)
+                        put(KEY_SIZE, fStation.size)
+                        put(KEY_STATE, fStation.state)  // Уже JSONObject
+                        put(KEY_TIMESTAMP, fStation.timestamp)
+                        put(KEY_TRAFFIC_LAST_DAY, fStation.lastDayTraffic)
+                        // Проверяем наличие событий и добавляем их в JSON
+                        if (fStation.events.isNotEmpty()) {
+                            put(KEY_EVENT, JSONArray(fStation.events))
                         } else {
-                            call.respond(HttpStatusCode.OK, "somethk wrong")
+                            put(KEY_EVENT, JSONArray())  // Если событий нет, добавляем пустой массив
                         }
                     }
+                    call.respond(HttpStatusCode.OK, fStationJson.toString())
+
+
 
 //                call.respond(HttpStatusCode.OK, jsonArray.toString())
                 } catch (e: Exception) {
                     e.printStackTrace()
-                } finally {
-                    jedis.close()
                 }
             }
 

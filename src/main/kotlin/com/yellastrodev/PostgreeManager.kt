@@ -1,6 +1,5 @@
 package com.yellastrodev
 
-
 import com.yellastrodev.yLogger.AppLogger
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -11,10 +10,12 @@ import org.json.JSONObject // Импортируем JSONObject, если исп
 object Stations : Table() {
     val stId = varchar("stId", 255) // Поле для stId
     val size = integer("size") // Поле для size (целое число)
-    val lastDayTraffic = varchar("lastDayTraffic", 255) // Поле для lastDayTraffic (строка)
-    val state = varchar("state", 1000) // Поле для state (JSON строка)
-    val events = varchar("events", 1000) // Поле для events (JSON строка)
+    val lastDayTraffic = text("lastDayTraffic") // Поле для lastDayTraffic (строка)
+    val state = text("state") // Поле для state (JSON строка)
+    val events = text("events") // Поле для events (JSON строка)
     val timestamp = integer("timestamp") // Поле для timestamp
+    val qrString = text("qrString",).default("") // Новое поле для qrString
+    val wallpaper = text("wallpaper").default("") // Новое поле для wallpaper
 }
 
 // Определение класса Station
@@ -24,16 +25,19 @@ data class Station(
     var lastDayTraffic: String = "",
     var state: JSONObject = JSONObject(), // Используем JSONObject для хранения состояния
     val events: ArrayList<JSONObject> = ArrayList(), // Список событий
-    val timestamp: Int = 0
+    val timestamp: Int = 0,
+    var qrString: String = "", // Новое поле для qrString
+    var wallpaper: String = "" // Новое поле для wallpaper
 )
 
 
+
 class PostgreeManager {
-    val TAG = "PostgreeManager"
+    private val TAG = "PostgreeManager"
 
-    val url3 = "jdbc:postgresql://aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
+    private val url3 = "jdbc:postgresql://aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
 
-    val password = "7821493402Ss"
+    private val password = "7821493402Ss"
 
     init {
         Database.connect(
@@ -62,6 +66,8 @@ class PostgreeManager {
                     it[state] = station.state.toString() // Обновляем поле state
                     it[events] = arrayToString(station.events) // Обновляем поле events
                     it[timestamp] = station.timestamp // Обновляем поле timestamp
+                    it[qrString] = station.qrString // Обновляем поле qrString
+                    it[wallpaper] = station.wallpaper // Обновляем поле wallpaper
                 }
             } else {
                 // Если станции нет, вставляем новую
@@ -72,6 +78,8 @@ class PostgreeManager {
                     it[state] = station.state.toString() // Вставляем поле state
                     it[events] = arrayToString(station.events) // Вставляем поле events
                     it[timestamp] = station.timestamp // Вставляем поле timestamp
+                    it[qrString] = station.qrString // Вставляем поле qrString
+                    it[wallpaper] = station.wallpaper // Вставляем поле wallpaper
                 }
             }
         }
@@ -95,17 +103,19 @@ class PostgreeManager {
 
                 Station(
                     stId = row[Stations.stId],
-                    size = row[Stations.size].toInt(), // Предполагается, что size хранится как строка в базе данных
-                    lastDayTraffic = row[Stations.lastDayTraffic], // Получаем lastDayTraffic
-                    state = JSONObject(row[Stations.state]), // Используем JSONObject для хранения состояния
-                    events = events, // Преобразуем список событий в ArrayList<JSONObject>
-                    timestamp = row[Stations.timestamp] // Получаем timestamp
+                    size = row[Stations.size],
+                    lastDayTraffic = row[Stations.lastDayTraffic],
+                    state = JSONObject(row[Stations.state]),
+                    events = events,
+                    timestamp = row[Stations.timestamp],
+                    qrString = row[Stations.qrString],
+                    wallpaper = row[Stations.wallpaper]
                 )
             }
         }
     }
 
-    fun getStations(limit: Int, offset: Int): List<Station> {
+    fun getStations(limit: Int = 20, offset: Int = 0): List<Station> {
         return transaction {
             Stations.selectAll()
                 .limit(limit, offset.toLong())
@@ -127,13 +137,13 @@ class PostgreeManager {
                         lastDayTraffic = row[Stations.lastDayTraffic],
                         state = JSONObject(row[Stations.state]),
                         events = events,
-                        timestamp = row[Stations.timestamp]
+                        timestamp = row[Stations.timestamp],
+                        qrString = row[Stations.qrString],
+                        wallpaper = row[Stations.wallpaper]
                     )
                 }
         }
     }
-
-
 
     private fun arrayToString(jsonArray: ArrayList<JSONObject>): String {
         // Преобразуем ArrayList<JSONObject> в строку
@@ -152,7 +162,4 @@ class PostgreeManager {
         }
         return jsonObjectList
     }
-
-
-
 }

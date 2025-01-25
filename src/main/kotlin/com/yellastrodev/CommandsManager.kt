@@ -1,6 +1,5 @@
 package com.yellastrodev
 
-import com.yellastrodev.DatabaseManager.jedisPool
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.CMD_CHANGE_WALLPAPER
 import java.util.concurrent.CompletableFuture
@@ -18,24 +17,18 @@ object CommandsManager {
 
     val waitMap: ConcurrentHashMap<String, CompletableFuture<JSONObject?>> = ConcurrentHashMap()
 
-    fun setWallpaper(stId: String?, newFileName: String) {
+    fun setWallpaper(stId: String, newFileName: String) {
         // поменять значение обоев в базе данных + отправить команду станции о смене обоев.
         // если даже команда не дойдет (мб офлайн), станция всёравно замет что id обоев стали разными локально и в базе
 
-        val jedis = jedisPool.resource
         try {
-            val key = "Stations:${stId}"
-            val fields = jedis.hgetAll(key)
-            val oldFileName = fields[CMD_CHANGE_WALLPAPER]
-            if (oldFileName != newFileName) {
-                fields[CMD_CHANGE_WALLPAPER] = newFileName
-                jedis.hset(key, CMD_CHANGE_WALLPAPER, newFileName)
+            val fStation = database.getStationById(stId)!!
+            if (fStation.wallpaper != newFileName) {
+                fStation.wallpaper = newFileName
                 sendCommandToStation(stId,JSONObject(mapOf(CMD_CHANGE_WALLPAPER to newFileName)))
             }
         } catch (e: Exception) {
             e.printStackTrace()
-        } finally {
-            jedis.close()
         }
     }
 
