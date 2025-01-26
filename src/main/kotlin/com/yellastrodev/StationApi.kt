@@ -44,23 +44,30 @@ fun Application.configureStationRouting() {
                         val trafficLastDay = call.request.queryParameters[KEY_TRAFFIC]
                         val events = call.request.queryParameters[KEY_EVENT]
 
+                        AppLogger.info(TAG, "timeout header: $timeoutHeader")
+
                         if (stId != null && timeoutHeader != null) {
-                            val timestamp = System.currentTimeMillis() / 1000
+                            val timestamp = (System.currentTimeMillis() / 1000).toInt()
 //                            AppLogger.info(TAG, "Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
 
                             var isUpdated = false
                             val fStation = try {
                                  database.getStationById(stId) ?: run {
-                                isUpdated = true
-                                Station(
-                                    stId,
-                                    timestamp = timestamp.toInt()
-                                )
-                            }
+                                    isUpdated = true
+                                    Station(
+                                        stId,
+                                        timestamp = timestamp
+                                    )
+                                }
                             } catch (e: Exception) {
                                 AppLogger.error(TAG, "${e.message} on $stId")
                                 call.response.status(HttpStatusCode.InternalServerError)
                                 return@get
+                            }
+
+                            if (timestamp != fStation.timestamp) {
+                                isUpdated = true
+                                fStation.timestamp = timestamp
                             }
 
                             size?.let {

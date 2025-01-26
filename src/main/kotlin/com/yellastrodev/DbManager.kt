@@ -11,7 +11,7 @@ data class Station(
     var lastDayTraffic: String = "",
     var state: JSONObject = JSONObject(), // Используем JSONObject для хранения состояния
     val events: ArrayList<JSONObject> = ArrayList(), // Список событий
-    val timestamp: Int = 0,
+    var timestamp: Int = 0,
     var qrString: String = "", // Новое поле для qrString
     var wallpaper: String = "" // Новое поле для wallpaper
 )

@@ -20,7 +20,16 @@ suspend fun extractParametersOrFail(
     val parameters = call.request.queryParameters
     val routParameters = call.parameters
     val recieveParams = if (call.request.httpMethod == HttpMethod.Post) {
-        call.receiveParameters()
+        val contentType = call.request.contentType()
+        when {
+            contentType.match(ContentType.Application.FormUrlEncoded) -> {
+                // Если запрос содержит application/x-www-form-urlencoded
+                 call.receiveParameters()
+            }
+
+            else -> { Parameters.Empty }
+        }
+//        call.receiveParameters()
     } else {
         Parameters.Empty // Или можно просто пустой объект, если нет тела в запросе
     }

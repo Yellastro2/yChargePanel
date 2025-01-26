@@ -41,14 +41,18 @@ class Logger(private val maxFileSize: Long = 1024 * 1024) { // 1 MB по умо�
         customHandlers.forEach { it(logMessage) }
     }
 
+    private val logLock = Any()
+
     private fun logToFile(message: String) {
         rotateLogFileIfNeeded()
-        try {
-            val writer = FileWriter(logFile, true)
-            writer.append(message).append("\n")
-            writer.close()
-        } catch (e: IOException) {
-            e.printStackTrace()
+        synchronized(logLock) {
+            try {
+                val writer = FileWriter(logFile, true)
+                writer.append(message).append("\n")
+                writer.close()
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
         }
     }
 

@@ -19,6 +19,8 @@ object Stations : Table() {
     val timestamp = integer("timestamp") // Поле для timestamp
     val qrString = text("qrString",).default("") // Новое поле для qrString
     val wallpaper = text("wallpaper").default("") // Новое поле для wallpaper
+
+    override val primaryKey = PrimaryKey(stId, name = "PK_Stations_stId")
 }
 
 
@@ -141,7 +143,8 @@ class PostgreeManager: DbManager {
     override fun getStations(limit: Int, offset: Int): List<Station> {
         return transaction {
             Stations.selectAll()
-                .limit(limit, offset.toLong())
+                .limit(limit).offset(offset.toLong())
+                .orderBy(Stations.timestamp to SortOrder.DESC)
                 .map { row ->
                     val events = if (row[Stations.events].isBlank()) {
                         ArrayList<JSONObject>()

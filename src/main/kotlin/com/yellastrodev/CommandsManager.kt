@@ -35,6 +35,7 @@ object CommandsManager {
     suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JSONObject? {
         val future = waitMap.computeIfAbsent(stId) { CompletableFuture<JSONObject?>() }
         return try {
+            // если таймаут стоит меньше 10 секунд, значит это запрос на первое подключение и нужно сразу же ответить что серв на связи
             withTimeoutOrNull((if (timeout > 10) timeout - 5 else 0).toLong() * 1000) {
                 future.await()
             }
