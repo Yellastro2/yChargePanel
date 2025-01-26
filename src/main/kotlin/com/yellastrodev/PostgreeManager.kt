@@ -171,6 +171,13 @@ class PostgreeManager: DbManager {
         }
     }
 
+    override fun getStationCount(): Int {
+        return transaction {
+            Stations.selectAll().count().toInt()
+        }
+    }
+
+
     private fun arrayToString(jsonArray: ArrayList<JSONObject>): String {
         // Преобразуем ArrayList<JSONObject> в строку
         val jsonArrayString = JSONArray(jsonArray).toString()
@@ -188,4 +195,6 @@ class PostgreeManager: DbManager {
         }
         return jsonObjectList
     }
+
+
 }

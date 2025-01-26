@@ -24,5 +24,7 @@ interface DbManager {
 
     fun getStations(limit: Int = 20, offset: Int = 0): List<Station>
 
+    fun getStationCount(): Int
+
 
 }

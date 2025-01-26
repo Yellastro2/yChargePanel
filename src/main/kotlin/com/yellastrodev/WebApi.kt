@@ -3,6 +3,7 @@ package com.yellastrodev
 import com.yellastrodev.CommandsManager.isClientConnected
 import com.yellastrodev.CommandsManager.sendCommandToStation
 import com.yellastrodev.CommandsManager.setWallpaper
+import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -31,7 +32,10 @@ data class CheckinData(val stId: String, val size: Int, val state: String)
 
 fun Application.configureWebApiRouting() {
 
+    val TAG = "WebApiRouting"
     val TIMEOUT_LOG_UPLOAD = 60L
+
+    val DEFAULT_IMAGE = "1.jpg"
 
     install(ContentNegotiation) {
         json(Json {
@@ -63,6 +67,7 @@ fun Application.configureWebApiRouting() {
 
 
             get("/$ROUT_DOWNLOAD") {
+                AppLogger.info(TAG,"api/$ROUT_DOWNLOAD")
                 val params = extractParametersOrFail(call, listOf(KEY_PATH)) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
                 } ?: return@get
@@ -187,28 +192,45 @@ fun Application.configureWebApiRouting() {
 
             get("/$ROUT_STATIONLIST") {
                 try {
-                    val fStations = database.getStations()
+                    // Получаем параметры `page` и `pageSize` из запроса
+                    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+                    val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 20
 
-                    val jsonArray = JSONArray().apply {
-                        fStations.forEach { station ->
-                            // Создаем JSONObject прямо из полей объекта Station
-                            val jsonObject = JSONObject().apply {
-                                put(KEY_STATION_ID, station.stId)
-                                put(KEY_SIZE, station.size)
-                                put(KEY_AVAIBLE, station.state.length())  // Количество полей в state
-                                put(KEY_TIMESTAMP, station.timestamp)
-                                put(KEY_TRAFFIC_LAST_DAY, station.lastDayTraffic)
+                    // Рассчитываем offset
+                    val offset = (page - 1) * pageSize
+
+                    // Получаем станции с учётом лимита и смещения
+                    val fStations = database.getStations(limit = pageSize, offset = offset)
+
+                    // Получаем общее количество станций для пагинации
+                    val totalStations = database.getStationCount()
+
+                    // Формируем ответ с данными станций и общим количеством
+                    val responseJson = JSONObject().apply {
+                        put("stations", JSONArray().apply {
+                            fStations.forEach { station ->
+                                put(JSONObject().apply {
+                                    put(KEY_STATION_ID, station.stId)
+                                    put(KEY_SIZE, station.size)
+                                    put(KEY_AVAIBLE, station.state.length()) // Количество полей в state
+                                    put(KEY_TIMESTAMP, station.timestamp)
+                                    put(KEY_TRAFFIC_LAST_DAY, station.lastDayTraffic)
+                                    put("wallpaper", if (station.wallpaper.isNullOrBlank()) DEFAULT_IMAGE else station.wallpaper)
+                                    put("QRCode", station.qrString)
+
+                                })
                             }
-                            this.put(jsonObject) // Добавляем объект в JSONArray
-                        }
+                        })
+                        put("total", totalStations)
                     }
 
-                    call.respond(HttpStatusCode.OK, jsonArray.toString())
+                    call.respond(HttpStatusCode.OK, responseJson.toString())
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    call.respond(HttpStatusCode.InternalServerError, "An error occurred")
                 }
-
             }
+
 
             get("/$ROUT_STATIONINFO") {
                 try {

@@ -10,6 +10,31 @@
  * Copyright 2011-2022 Twitter, Inc.
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  */
+
+.datatable-pagination-list-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.datatable-pagination-list-item:hover {
+    background-color: #f0f0f0;
+}
+
+.datatable-pagination-list-item.datatable-active {
+    background-color: #007bff; /* Цвет фона для активной кнопки */
+    color: white; /* Цвет текста для активной кнопки */
+    border-color: #007bff; /* Цвет границы для активной кнопки */
+}
+
+.datatable-pagination-list-item.datatable-disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+
 :root {
   --bs-blue: #0d6efd;
   --bs-indigo: #6610f2;
