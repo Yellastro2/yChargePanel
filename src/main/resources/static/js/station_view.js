@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const forceButton = document.createElement('button');
             forceButton.textContent = 'Форс';
             forceButton.className = 'btn btn-primary';
-            forceButton.onclick = () => alert(`Форс ${stateData ? stateData.bankId : data.stId}`);
+            forceButton.onclick = () => forceSlot(currentHost, stId, i);
             actionsCell.appendChild(forceButton);
 
             const blockButton = document.createElement('button');
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-            if (stateData) {
+            if (true) {
                 row.appendChild(actionsCell);
             }
 
@@ -173,6 +173,16 @@ function getLogs(currentHost, stId) {
             console.log('Logs successfully downloaded.');
         })
         .catch(error => console.error('Error getting logs:', error));
+}
+
+function forceSlot(currentHost, stId, num) {
+    const apiUrl = `${currentHost}/api/force?stId=${stId}&num=${num}`;
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+        //            alert(`Слот ${num} открыт: ${data.status}`);
+    })
+        .catch(error => console.error('Error forcing slot:', error));
 }
 
 

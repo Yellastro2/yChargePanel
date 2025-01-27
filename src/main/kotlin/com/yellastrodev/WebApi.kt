@@ -14,7 +14,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.utils.io.*
-import io.ktor.utils.io.core.*
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.readByteArray
@@ -26,14 +25,14 @@ import java.io.*
 import java.util.concurrent.CompletableFuture
 
 
-
-@Serializable
-data class CheckinData(val stId: String, val size: Int, val state: String)
-
 fun Application.configureWebApiRouting() {
+
+    // Карта для хранения колбеков
+    val uploadLogsCallbacks = mutableMapOf<String, CompletableFuture<Unit>>()
 
     val TAG = "WebApiRouting"
     val TIMEOUT_LOG_UPLOAD = 60L
+    val ONLINE_SECONDS = 60 * 3
 
     val DEFAULT_IMAGE = "1.jpg"
 
@@ -44,41 +43,8 @@ fun Application.configureWebApiRouting() {
         })
     }
 
-
-    // Карта для хранения колбеков
-    val uploadLogsCallbacks = mutableMapOf<String, CompletableFuture<Unit>>()
-
     routing {
         route("/api") {
-            get("/$ROUT_RELEASE") {
-                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID,KEY_NUM)) { errorMessage ->
-                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
-                } ?: return@get
-
-                val stId = params[KEY_STATION_ID]!!
-                val num = params[KEY_NUM]!!
-
-                sendCommandToStation(stId, JSONObject(mapOf(CMD_RELEASE to num)))
-                call.respond(HttpStatusCode.OK, """{"status": "released"}""")
-            }
-
-
-
-
-
-            get("/$ROUT_DOWNLOAD") {
-                AppLogger.info(TAG,"api/$ROUT_DOWNLOAD")
-                val params = extractParametersOrFail(call, listOf(KEY_PATH)) { errorMessage ->
-                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
-                } ?: return@get
-                val filePath = params[KEY_PATH]!!
-                val file = File("$PATH_BASE/$filePath")
-                if (file.exists()) {
-                    call.respondFile(file)
-                } else {
-                    call.respond(HttpStatusCode.NotFound, "Файл не найден")
-                }
-            }
 
             post("/$ROUT_UPLOAD_WALLPAPER/{$KEY_STATION_ID}") {
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID)) { errorMessage ->
@@ -111,10 +77,6 @@ fun Application.configureWebApiRouting() {
             }
 
 
-
-
-
-
             post("/$ROUT_SET_QR/{stId}") {
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID,KEY_TEXT)) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
@@ -142,8 +104,6 @@ fun Application.configureWebApiRouting() {
                 }
             }
 
-
-
             get("/$ROUT_GET_LOGS") {
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID)) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
@@ -152,42 +112,35 @@ fun Application.configureWebApiRouting() {
                 val stId = params[KEY_STATION_ID]!!
                 val uploadDir = File("${PATH_LOGFILES}/${stId}")
                 val lastLogFile = findLatestLogFile(uploadDir)?.name ?: "0"
-                if (stId != null) {
-                    // TODO_1
-                    // Проверяем, на связи ли клиент
-                    val isClientConnected = isClientConnected(stId)
-                    if (isClientConnected) {
-                        // Создаем CompletableFuture для загрузки логов
-                        val uploadFuture = CompletableFuture<Unit>()
-                        uploadLogsCallbacks[stId] = uploadFuture
+                // TODO_1
+                // Проверяем, на связи ли клиент
+                val isClientConnected = isClientConnected(stId)
+                if (isClientConnected) {
+                    // Создаем CompletableFuture для загрузки логов
+                    val uploadFuture = CompletableFuture<Unit>()
+                    uploadLogsCallbacks[stId] = uploadFuture
 
-                        // Отправляем команду на получение логов
-                        sendCommandToStation(stId, JSONObject(mapOf(CMD_GETLOGS to lastLogFile)))
-//                    waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
+                    // Отправляем команду на получение логов
+                    sendCommandToStation(stId, JSONObject(mapOf(CMD_GETLOGS to lastLogFile)))
 
-                        // Ожидаем загрузки логов
-                        val uploadCompleted = withTimeoutOrNull(TIMEOUT_LOG_UPLOAD * 1000) {
-                            uploadLogsCallbacks[stId]?.await()
-                        }
-                        if (uploadCompleted != null) {
-                            print("""{"status": "logs uploaded"}""")
-//                        call.respond(HttpStatusCode.OK, """{"status": "logs uploaded"}""")
-                        } else {
-                            print("""{"status": "upload timeout"}""")
-//                        call.respond(HttpStatusCode.RequestTimeout, """{"status": "upload timeout"}""")
-                        }
-                    } else {
-                        // Клиент не на связи, сразу отвечаем
-                        print("""{"status": "client not connected"}""")
-//                    call.respond(HttpStatusCode.OK, """{"status": "client not connected"}""")
+                    // Ожидаем загрузки логов
+                    val uploadCompleted = withTimeoutOrNull(TIMEOUT_LOG_UPLOAD * 1000) {
+                        uploadLogsCallbacks[stId]?.await()
                     }
-                    val zipFile = getLastLogZip(stId)
-                    call.respondFile(zipFile)
-//                waitMap[stId]?.complete(JsonObject(mapOf(CMD_GETLOGS to JsonPrimitive(lastLogFile))))
-//                call.respond(HttpStatusCode.OK, """{"status": "getting.."}""")
+                    if (uploadCompleted != null) {
+                        AppLogger.info(TAG,"""{"status": "logs uploaded"}""")
+//                        call.respond(HttpStatusCode.OK, """{"status": "logs uploaded"}""")
+                    } else {
+                        AppLogger.info(TAG,"""{"status": "upload timeout"}""")
+//                        call.respond(HttpStatusCode.RequestTimeout, """{"status": "upload timeout"}""")
+                    }
                 } else {
-                    call.respond(HttpStatusCode.BadRequest, "Invalid or missing 'stId'")
+                    // Клиент не на связи, сразу отвечаем
+                    AppLogger.info(TAG,"""{"status": "client not connected"}""")
+//                    call.respond(HttpStatusCode.OK, """{"status": "client not connected"}""")
                 }
+                val zipFile = getLastLogZip(stId)
+                call.respondFile(zipFile)
             }
 
             get("/$ROUT_STATIONLIST") {
@@ -195,15 +148,20 @@ fun Application.configureWebApiRouting() {
                     // Получаем параметры `page` и `pageSize` из запроса
                     val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
                     val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 20
+                    val filter = call.request.queryParameters["filter"]?: "" // Онлайн или офлайн фильтр
 
                     // Рассчитываем offset
                     val offset = (page - 1) * pageSize
 
+                    val onlineTimestamp = ((System.currentTimeMillis() / 1000) - ONLINE_SECONDS).toInt()
+
                     // Получаем станции с учётом лимита и смещения
-                    val fStations = database.getStations(limit = pageSize, offset = offset)
+                    val fStationsInfo = database.getStations(limit = pageSize, offset = offset, filter = filter, onlineTimestamp)
+
+                    val fStations = fStationsInfo.first
 
                     // Получаем общее количество станций для пагинации
-                    val totalStations = database.getStationCount()
+                    val totalStations = database.getStationCount(onlineTimestamp)
 
                     // Формируем ответ с данными станций и общим количеством
                     val responseJson = JSONObject().apply {
@@ -215,13 +173,15 @@ fun Application.configureWebApiRouting() {
                                     put(KEY_AVAIBLE, station.state.length()) // Количество полей в state
                                     put(KEY_TIMESTAMP, station.timestamp)
                                     put(KEY_TRAFFIC_LAST_DAY, station.lastDayTraffic)
-                                    put("wallpaper", if (station.wallpaper.isNullOrBlank()) DEFAULT_IMAGE else station.wallpaper)
+                                    put("wallpaper", if (station.wallpaper.isBlank()) DEFAULT_IMAGE else station.wallpaper)
                                     put("QRCode", station.qrString)
 
                                 })
                             }
                         })
-                        put("total", totalStations)
+                        put("total", totalStations.first)
+                        put("online", totalStations.second)
+                        put("filtred",fStationsInfo.second)
                     }
 
                     call.respond(HttpStatusCode.OK, responseJson.toString())
@@ -230,7 +190,6 @@ fun Application.configureWebApiRouting() {
                     call.respond(HttpStatusCode.InternalServerError, "An error occurred")
                 }
             }
-
 
             get("/$ROUT_STATIONINFO") {
                 try {
@@ -258,13 +217,33 @@ fun Application.configureWebApiRouting() {
                         }
                     }
                     call.respond(HttpStatusCode.OK, fStationJson.toString())
-
-
-
-//                call.respond(HttpStatusCode.OK, jsonArray.toString())
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
+            }
+
+            get("/$ROUT_RELEASE") {
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, KEY_NUM)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@get
+
+                val stId = params[KEY_STATION_ID]!!
+                val num = params[KEY_NUM]!!
+
+                sendCommandToStation(stId, JSONObject(mapOf(CMD_RELEASE to num)))
+                call.respond(HttpStatusCode.OK, """{"status": "command released send"}""")
+            }
+
+            get("/$ROUT_FORCE") {
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, KEY_NUM)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@get
+
+                val stId = params[KEY_STATION_ID]!!
+                val num = params[KEY_NUM]!!
+
+                sendCommandToStation(stId, JSONObject(mapOf(CMD_FORCE to num)))
+                call.respond(HttpStatusCode.OK, """{"status": "command force released send"}""")
             }
 
             post("/$ROUT_UPLOADLOGS") {
@@ -283,17 +262,13 @@ fun Application.configureWebApiRouting() {
                         part.dispose()
                     }
                 }
-
                 // Вызываем колбек, если он существует
                 uploadLogsCallbacks[stId]?.complete(Unit)
                 uploadLogsCallbacks.remove(stId)
 
                 call.respondText("Archive uploaded and extracted successfully")
             }
-
         }
-
-
     }
 }
 

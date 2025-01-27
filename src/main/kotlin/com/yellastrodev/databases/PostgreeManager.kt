@@ -1,10 +1,11 @@
-package com.yellastrodev
+package com.yellastrodev.databases
 
+import com.yellastrodev.DbManager
+import com.yellastrodev.Station
 import com.yellastrodev.yLogger.AppLogger
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.Table.Dual.columns
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.json.JSONArray
 import org.json.JSONObject // Импортируем JSONObject, если используете библиотеку org.json
@@ -140,42 +141,65 @@ class PostgreeManager: DbManager {
         }
     }
 
-    override fun getStations(limit: Int, offset: Int): List<Station> {
+    override fun getStations(limit: Int, offset: Int, filter: String, onlineSeconds: Int): Pair<List<Station>, Int> {
         return transaction {
-            Stations.selectAll()
-                .limit(limit).offset(offset.toLong())
-                .orderBy(Stations.timestamp to SortOrder.DESC)
-                .map { row ->
-                    val events = if (row[Stations.events].isBlank()) {
+
+            // Основной запрос
+            val query = Stations
+                .selectAll()
+
+            // Если есть фильтр, применяем его
+            if (filter == "online") {
+                query.andWhere { Stations.timestamp greaterEq onlineSeconds }
+            } else if (filter == "offline") {
+                query.andWhere { Stations.timestamp less onlineSeconds }
+            }
+
+            val totalCount = query.count().toInt()
+
+
+            query.limit(limit).offset(offset.toLong())
+
+            query.orderBy(Stations.timestamp to SortOrder.DESC)
+
+            val stations = query.map { station ->
+                val events = if (station[Stations.events].isBlank()) {
                         ArrayList<JSONObject>()
                     } else {
                         try {
-                            stringToArray(row[Stations.events])
+                            stringToArray(station[Stations.events])
                         } catch (e: Exception) {
                             AppLogger.error(TAG, "Error parsing events: ${e.message}")
                             ArrayList<JSONObject>()
                         }
                     }
+                Station(
+                    stId = station[Stations.stId],
+                    size = station[Stations.size],
+                    state = JSONObject(station[Stations.state]),
+                    events = events,
+                    timestamp = station[Stations.timestamp],
+                    lastDayTraffic = station[Stations.lastDayTraffic],
+                    wallpaper = station[Stations.wallpaper],
+                    qrString = station[Stations.qrString]
+                )
+            }
 
-                    Station(
-                        stId = row[Stations.stId],
-                        size = row[Stations.size],
-                        lastDayTraffic = row[Stations.lastDayTraffic],
-                        state = JSONObject(row[Stations.state]),
-                        events = events,
-                        timestamp = row[Stations.timestamp],
-                        qrString = row[Stations.qrString],
-                        wallpaper = row[Stations.wallpaper]
-                    )
-                }
+            Pair(stations, totalCount)
         }
     }
 
-    override fun getStationCount(): Int {
+    override fun getStationCount(fTimestamp: Int): Pair<Int, Int> {
         return transaction {
-            Stations.selectAll().count().toInt()
+            // Выполняем два агрегационных запроса с фильтрацией
+            val totalCount = Stations.selectAll().count().toInt()
+            val filteredCount = Stations.select(Stations.timestamp).where {Stations.timestamp greater fTimestamp }.count().toInt()
+
+            totalCount to filteredCount
         }
     }
+
+
 
 
     private fun arrayToString(jsonArray: ArrayList<JSONObject>): String {

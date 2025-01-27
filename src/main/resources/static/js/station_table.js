@@ -1,5 +1,32 @@
 const pageSize = 20; // Количество станций на странице
 let currentPage = 1; // Текущая страница
+const DEFAULT_ONLINE = 60 * 3
+
+let currentFilter = ""
+
+// Получаем элементы кнопок один раз
+const totalValueElem = document.getElementById('total-value');
+const onlineValueElem = document.getElementById('online-value');
+const offlineValueElem = document.getElementById('offline-value');
+
+// Сохраняем кнопки в переменные
+const totalBtn = document.getElementById('total-button');
+const onlineBtn = document.getElementById('online-button');
+const offlineBtn = document.getElementById('offline-button');
+
+// Обработчики кликов
+totalBtn.onclick = function() {
+    loadStations(1);  // Просто вызывает с пустым фильтром
+};
+
+onlineBtn.onclick = function() {
+    loadStations(1, 'online');  // Добавляет фильтр для онлайн
+};
+
+offlineBtn.onclick = function() {
+    loadStations(1, 'offline');  // Добавляет фильтр для оффлайн
+};
+
 
 document.addEventListener('DOMContentLoaded', function () {
     // Считываем текущую страницу из URL
@@ -13,14 +40,20 @@ document.addEventListener('DOMContentLoaded', function () {
     loadStations(currentPage);
 });
 
-function loadStations(page) {
+function loadStations(page, filter = '') {
     const currentHost = window.location.origin;
-    const apiUrl = `${currentHost}/api/stationList?page=${page}&pageSize=${pageSize}`;
+    const apiUrl = `${currentHost}/api/stationList?page=${page}&pageSize=${pageSize}&filter=${filter}`;
 
+    currentFilter = filter
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
-        const { stations, total } = data; // Предполагаем, что API возвращает массив `stations` и общее количество `total`
+        const { stations, total, online, filtred } = data; // Предполагаем, что API возвращает массив `stations` и общее количество `total`
+
+        // Обновление значений в кнопках
+        totalValueElem.textContent = total;
+        onlineValueElem.textContent = online;
+        offlineValueElem.textContent = total - online;
 
         const table = document.getElementById('station_table');
         table.innerHTML = ''; // Очистить таблицу перед загрузкой новых данных
@@ -52,6 +85,16 @@ function loadStations(page) {
                 hour: '2-digit',
                 minute: '2-digit'
             });
+            // Проверяем, меньше ли timestamp текущего времени минус DEFAULT_ONLINE
+            const currentTime = Date.now() / 1000; // Текущее время в секундах
+            if (station.timestamp > currentTime - DEFAULT_ONLINE) {
+                timestampCell.style.color = 'green';  // Если меньше, то зелёный
+                timestampCell.style.fontWeight = 'bold';  // Добавляем жирный текст
+            } else {
+                timestampCell.style.color = 'black';  // Иначе чёрный
+                timestampCell.style.fontWeight = 'normal';  // Обычный текст
+            }
+
             row.appendChild(timestampCell);
 
             const trafficCell = document.createElement('td');
@@ -94,7 +137,7 @@ function loadStations(page) {
             table.appendChild(row);
         });
 
-        renderPagination(total);
+        renderPagination(filtred);
     })
         .catch(error => console.error('Error fetching station list:', error));
 }
@@ -160,7 +203,7 @@ function changePage(page) {
     window.history.pushState({ page }, `Page ${page}`, newUrl);
 
     // Загружаем данные для новой страницы
-    loadStations(page);
+    loadStations(page, currentFilter);
 }
 
 

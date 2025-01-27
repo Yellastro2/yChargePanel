@@ -1,4 +1,4 @@
-package com.yellastrodev
+package com.yellastrodev.databases
 
 import redis.clients.jedis.JedisPool
 import redis.clients.jedis.JedisPoolConfig
@@ -17,5 +17,6 @@ object DatabaseManager {
         REDIS_HOST,
         REDIS_PORT,
         6000,
-        REDIS_PAS)
+        REDIS_PAS
+    )
 }
