@@ -62,6 +62,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const qrForm = document.getElementById('changeQR');
         qrForm.action = `/api/setQR/${stId}`;
 
+        const blockedSlots = data.blockedSlots
+
 
 
         for (let i = 1; i <= size; i++) {
@@ -101,9 +103,11 @@ document.addEventListener('DOMContentLoaded', function() {
             actionsCell.appendChild(forceButton);
 
             const blockButton = document.createElement('button');
-            blockButton.textContent = 'Заблокировать';
-            blockButton.className = 'btn btn-primary';
-            blockButton.onclick = () => alert(`Заблокировать ${stateData ? stateData.bankId : data.stId}`);
+            blockButton.textContent = blockedSlots[i - 1] === 0 ? 'Заблокировать' : 'Разблокировать';
+            blockButton.className = blockedSlots[i - 1] === 0 ? 'btn btn-success' : 'btn btn-danger';
+
+//            blockButton.className = 'btn btn-primary';
+            blockButton.onclick = () => blockSlot(currentHost, stId, i);
             actionsCell.appendChild(blockButton);
 
 
@@ -180,6 +184,7 @@ function forceSlot(currentHost, stId, num) {
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
+            console.log(data)
         //            alert(`Слот ${num} открыт: ${data.status}`);
     })
         .catch(error => console.error('Error forcing slot:', error));
@@ -191,7 +196,19 @@ function releaseSlot(currentHost, stId, num) {
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
+            console.log(data)
 //            alert(`Слот ${num} открыт: ${data.status}`);
         })
         .catch(error => console.error('Error releasing slot:', error));
+}
+
+function blockSlot(currentHost, stId, num) {
+    const apiUrl = `${currentHost}/api/block_slot?stId=${stId}&num=${num}`;
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            console.log(data)
+        //            alert(`Слот ${num} открыт: ${data.status}`);
+    })
+        .catch(error => console.error('Error blocking slot:', error));
 }

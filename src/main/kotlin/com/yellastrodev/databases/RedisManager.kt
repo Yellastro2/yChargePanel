@@ -3,7 +3,7 @@ package com.yellastrodev.databases
 import redis.clients.jedis.JedisPool
 import redis.clients.jedis.JedisPoolConfig
 
-object DatabaseManager {
+object RedisManager {
     val REDIS_HOST = "redis-12855.crce175.eu-north-1-1.ec2.redns.redis-cloud.com"
     val REDIS_PORT = 12855
     val REDIS_PAS = "mT9UIPBt7IC3IhA3uFe3XG06awiPMRyh"

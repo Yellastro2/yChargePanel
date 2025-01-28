@@ -3,6 +3,8 @@ package com.yellastrodev
 import com.yellastrodev.CommandsManager.isClientConnected
 import com.yellastrodev.CommandsManager.sendCommandToStation
 import com.yellastrodev.CommandsManager.setWallpaper
+import com.yellastrodev.databases.Station
+import com.yellastrodev.databases.database
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
@@ -17,7 +19,6 @@ import io.ktor.utils.io.*
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.readByteArray
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -99,7 +100,7 @@ fun Application.configureWebApiRouting() {
 
                     call.respondRedirect("$ROUT_STATION/${stId}")
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLogger.error(TAG, "An error occurred", e)
                     call.respondRedirect("$ROUT_STATION/${stId}")
                 }
             }
@@ -186,8 +187,8 @@ fun Application.configureWebApiRouting() {
 
                     call.respond(HttpStatusCode.OK, responseJson.toString())
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    call.respond(HttpStatusCode.InternalServerError, "An error occurred")
+                    AppLogger.error(TAG, "An error occurred", e)
+                    call.respond(HttpStatusCode.InternalServerError, "An error occurred: ${e.printStackTrace()}",)
                 }
             }
 
@@ -215,10 +216,15 @@ fun Application.configureWebApiRouting() {
                         } else {
                             put(KEY_EVENT, JSONArray())  // Если событий нет, добавляем пустой массив
                         }
+                        val blockedSlotsState = fStation.blockedSlots.map { if (it == Station.SlotStatus.BLOCKED) 1 else 0 }
+
+                        put("blockedSlots", JSONArray(blockedSlotsState))
+
+
                     }
                     call.respond(HttpStatusCode.OK, fStationJson.toString())
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLogger.error(TAG, "An error occurred", e)
                 }
             }
 
@@ -228,7 +234,16 @@ fun Application.configureWebApiRouting() {
                 } ?: return@get
 
                 val stId = params[KEY_STATION_ID]!!
-                val num = params[KEY_NUM]!!
+                val num = params[KEY_NUM]!!.toInt()
+
+                val fStation = database.getStationById(stId)
+
+                fStation?.let {
+                    if (it.blockedSlots[num - 1] == Station.SlotStatus.BLOCKED) {
+                        call.respond(HttpStatusCode.OK, """{"status": "slot is blocked"}""")
+                        return@get
+                    }
+                }
 
                 sendCommandToStation(stId, JSONObject(mapOf(CMD_RELEASE to num)))
                 call.respond(HttpStatusCode.OK, """{"status": "command released send"}""")
@@ -244,6 +259,29 @@ fun Application.configureWebApiRouting() {
 
                 sendCommandToStation(stId, JSONObject(mapOf(CMD_FORCE to num)))
                 call.respond(HttpStatusCode.OK, """{"status": "command force released send"}""")
+            }
+
+            get("/$ROUT_BLOCK_SLOT") {
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, KEY_NUM)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@get
+
+                val stId = params[KEY_STATION_ID]!!
+                val num = params[KEY_NUM]!!.toInt() - 1
+
+                val fStation = database.getStationById(stId)
+
+                fStation?.let {
+                    fStation.blockedSlots[num] = fStation.blockedSlots[num].let {
+                        if (it == Station.SlotStatus.BLOCKED) Station.SlotStatus.UNBLOCKED else Station.SlotStatus.BLOCKED
+                    }
+                    database.updateStation(fStation)
+                    val fResult = fStation.blockedSlots[num].toString()
+                    call.respond(HttpStatusCode.OK, """{"status": "$fResult"}""")
+                } ?: run {
+                    call.respond(HttpStatusCode.NotFound, """{"status": "station not found"}""")
+                }
+
             }
 
             post("/$ROUT_UPLOADLOGS") {

@@ -1,11 +1,20 @@
 package com.yellastrodev.databases
 
-import com.yellastrodev.DbManager
-import com.yellastrodev.Station
+import com.yellastrodev.databases.Stations.blockedSlots
+import com.yellastrodev.databases.Stations.events
+import com.yellastrodev.databases.Stations.lastDayTraffic
+import com.yellastrodev.databases.Stations.qrString
+import com.yellastrodev.databases.Stations.size
+import com.yellastrodev.databases.Stations.stId
+import com.yellastrodev.databases.Stations.state
+import com.yellastrodev.databases.Stations.timestamp
+import com.yellastrodev.databases.Stations.wallpaper
 import com.yellastrodev.yLogger.AppLogger
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.statements.InsertStatement
+import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.json.JSONArray
 import org.json.JSONObject // Импортируем JSONObject, если используете библиотеку org.json
@@ -20,13 +29,9 @@ object Stations : Table() {
     val timestamp = integer("timestamp") // Поле для timestamp
     val qrString = text("qrString",).default("") // Новое поле для qrString
     val wallpaper = text("wallpaper").default("") // Новое поле для wallpaper
-
+    val blockedSlots = text("blockedSlots").default("[]")
     override val primaryKey = PrimaryKey(stId, name = "PK_Stations_stId")
 }
-
-
-
-
 
 class PostgreeManager: DbManager {
     private val TAG = "PostgreeManager"
@@ -75,6 +80,47 @@ class PostgreeManager: DbManager {
         }
     }
 
+    fun serializeStation(updateStatement: org.jetbrains.exposed.sql.statements.UpdateBuilder<*>, station: Station) {
+        updateStatement[stId] = station.stId
+        updateStatement[size] = station.size // Обновляем поле size
+        updateStatement[lastDayTraffic] = station.lastDayTraffic // Обновляем поле lastDayTraffic
+        updateStatement[state] = station.state.toString() // Обновляем поле state
+        updateStatement[events] = arrayToString(station.events) // Обновляем поле events
+        updateStatement[timestamp] = station.timestamp // Обновляем поле timestamp
+        updateStatement[qrString] = station.qrString // Обновляем поле qrString
+        updateStatement[wallpaper] = station.wallpaper // Обновляем поле wallpaper
+        updateStatement[blockedSlots] = JSONArray(station.blockedSlots.map { it.name }).toString()
+    }
+
+    fun deserializeStation(row: ResultRow): Station {
+        val events = if (row[Stations.events].isBlank()) {
+            ArrayList<JSONObject>()
+        } else {
+            try {
+                stringToArray(row[Stations.events])
+            } catch (e: Exception) {
+                AppLogger.error(TAG, "Error parsing events: ${e.message}")
+                ArrayList<JSONObject>()
+            }
+        }
+
+        val jsonArray = JSONArray(row[Stations.blockedSlots])
+
+        return Station(
+            stId = row[Stations.stId],
+            size = row[Stations.size],
+            lastDayTraffic = row[Stations.lastDayTraffic],
+            state = JSONObject(row[Stations.state]),
+            events = events,
+            timestamp = row[Stations.timestamp],
+            qrString = row[Stations.qrString],
+            wallpaper = row[Stations.wallpaper],
+            blockedSlots = Array(row[Stations.size]) { index ->
+                Station.SlotStatus.valueOf(jsonArray.optString(index, Station.SlotStatus.UNBLOCKED.toString())) // Десериализация в массив SlotStatus
+            }
+        )
+    }
+
     override fun updateStation(station: Station) {
         transaction {
             // Проверяем, существует ли станция с таким stId
@@ -83,25 +129,12 @@ class PostgreeManager: DbManager {
             if (existingStation != null) {
                 // Если станция существует, обновляем ее
                 Stations.update({ Stations.stId eq station.stId }) {
-                    it[size] = station.size // Обновляем поле size
-                    it[lastDayTraffic] = station.lastDayTraffic // Обновляем поле lastDayTraffic
-                    it[state] = station.state.toString() // Обновляем поле state
-                    it[events] = arrayToString(station.events) // Обновляем поле events
-                    it[timestamp] = station.timestamp // Обновляем поле timestamp
-                    it[qrString] = station.qrString // Обновляем поле qrString
-                    it[wallpaper] = station.wallpaper // Обновляем поле wallpaper
+                    serializeStation(it, station)
                 }
             } else {
                 // Если станции нет, вставляем новую
                 Stations.insert {
-                    it[stId] = station.stId
-                    it[size] = station.size // Вставляем поле size
-                    it[lastDayTraffic] = station.lastDayTraffic // Вставляем поле lastDayTraffic
-                    it[state] = station.state.toString() // Вставляем поле state
-                    it[events] = arrayToString(station.events) // Вставляем поле events
-                    it[timestamp] = station.timestamp // Вставляем поле timestamp
-                    it[qrString] = station.qrString // Вставляем поле qrString
-                    it[wallpaper] = station.wallpaper // Вставляем поле wallpaper
+                    serializeStation(it, station)
                 }
             }
         }
@@ -116,27 +149,7 @@ class PostgreeManager: DbManager {
 
             Stations.selectAll().where { Stations.stId eq stId }.singleOrNull()?.let { row ->
                 // Преобразуем результат в объект Station
-                val events = if (row[Stations.events].isBlank()) {
-                    ArrayList<JSONObject>()
-                } else {
-                    try {
-                        stringToArray(row[Stations.events])
-                    } catch (e: Exception) {
-                        AppLogger.error(TAG, "Error parsing events: ${e.message}")
-                        ArrayList<JSONObject>()
-                    }
-                }
-
-                Station(
-                    stId = row[Stations.stId],
-                    size = row[Stations.size],
-                    lastDayTraffic = row[Stations.lastDayTraffic],
-                    state = JSONObject(row[Stations.state]),
-                    events = events,
-                    timestamp = row[Stations.timestamp],
-                    qrString = row[Stations.qrString],
-                    wallpaper = row[Stations.wallpaper]
-                )
+                deserializeStation(row)
             }
         }
     }
@@ -163,26 +176,7 @@ class PostgreeManager: DbManager {
             query.orderBy(Stations.timestamp to SortOrder.DESC)
 
             val stations = query.map { station ->
-                val events = if (station[Stations.events].isBlank()) {
-                        ArrayList<JSONObject>()
-                    } else {
-                        try {
-                            stringToArray(station[Stations.events])
-                        } catch (e: Exception) {
-                            AppLogger.error(TAG, "Error parsing events: ${e.message}")
-                            ArrayList<JSONObject>()
-                        }
-                    }
-                Station(
-                    stId = station[Stations.stId],
-                    size = station[Stations.size],
-                    state = JSONObject(station[Stations.state]),
-                    events = events,
-                    timestamp = station[Stations.timestamp],
-                    lastDayTraffic = station[Stations.lastDayTraffic],
-                    wallpaper = station[Stations.wallpaper],
-                    qrString = station[Stations.qrString]
-                )
+                deserializeStation(station)
             }
 
             Pair(stations, totalCount)

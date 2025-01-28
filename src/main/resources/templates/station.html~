@@ -51,7 +51,7 @@
                                             <th data-sortable="true" style="width: 8%;">
                                                 <a href="#" class="datatable-sorter">Статус слота</a></th>
                                             <th data-sortable="true" style="width: 30%;">
-                                                <a href="#" class="datatable-sorter">Действия со слотом</a></th>
+                                                <a href="#" class="datatable-sorter">Действия</a></th>
                                         </tr>
                                         </thead>
                                         <tbody id="station_table">

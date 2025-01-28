@@ -1,6 +1,8 @@
 package com.yellastrodev
 
 import com.yellastrodev.CommandsManager.waitForEventOrTimeout
+import com.yellastrodev.databases.Station
+import com.yellastrodev.databases.database
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
@@ -60,7 +62,7 @@ fun Application.configureStationRouting() {
                                     )
                                 }
                             } catch (e: Exception) {
-                                AppLogger.error(TAG, "${e.message} on $stId")
+                                AppLogger.error(TAG, "Error on $stId", e)
                                 call.response.status(HttpStatusCode.InternalServerError)
                                 return@get
                             }
@@ -158,7 +160,8 @@ fun Application.configureStationRouting() {
                                 try {
                                     database.updateStation(fStation)
                                 } catch (e: Exception) {
-                                    AppLogger.error(TAG, "${e.message} on UPDATE $stId")
+                                    AppLogger.error(TAG, "Error on UPDATE $stId\n" +
+                                            "on /stationApi/$ROUT_CHECKIN", e)
                                     call.response.status(HttpStatusCode.InternalServerError)
                                     return@get
                                 }
@@ -191,7 +194,7 @@ fun Application.configureStationRouting() {
                         }
 
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        AppLogger.error(TAG, "An error occurred", e)
                     } finally {
 //                        jedis.close()
                     }

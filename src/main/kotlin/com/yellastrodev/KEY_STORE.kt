@@ -58,6 +58,7 @@ val ROUT_UPLOAD_WALLPAPER = "upload"
 val ROUT_DOWNLOAD = "download"
 val ROUT_RELEASE = "release"
 val ROUT_FORCE = "force"
+val ROUT_BLOCK_SLOT = "block_slot"
 val ROUT_STATION = "/station"
 
 val PATH_BASE = "uploads"
