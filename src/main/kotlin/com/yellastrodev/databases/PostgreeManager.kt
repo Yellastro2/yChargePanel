@@ -9,6 +9,7 @@ import com.yellastrodev.databases.Stations.stId
 import com.yellastrodev.databases.Stations.state
 import com.yellastrodev.databases.Stations.timestamp
 import com.yellastrodev.databases.Stations.wallpaper
+import com.yellastrodev.databases.entities.Powerbank
 import com.yellastrodev.yLogger.AppLogger
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
@@ -32,6 +33,14 @@ object Stations : Table() {
     val blockedSlots = text("blockedSlots").default("[]")
     override val primaryKey = PrimaryKey(stId, name = "PK_Stations_stId")
 }
+
+object Powerbanks : Table() {
+    val id = varchar("id", 255) // Идентификатор повербанка
+    val status = enumerationByName("status", 50, Powerbank.Status::class) // Статус повербанка
+
+    override val primaryKey = PrimaryKey(id, name = "PK_Powerbanks_id")
+}
+
 
 class PostgreeManager: DbManager {
     private val TAG = "PostgreeManager"
@@ -67,16 +76,11 @@ class PostgreeManager: DbManager {
         hikariDataSource = HikariDataSource(hikariConfig)
 
         Database.connect(hikariDataSource)
-//        Database.connect(
-//            url3,
-//            driver = "org.postgresql.Driver",
-//            user = "postgres.wqfqhszmsmsyvhjsgjuz",
-//            password = password
-//        )
 
         transaction {
             // Создание таблицы, если она не существует
             SchemaUtils.create(Stations)
+            SchemaUtils.create(Powerbanks)
         }
     }
 
@@ -142,13 +146,8 @@ class PostgreeManager: DbManager {
 
     override fun getStationById(stId: String): Station? {
         return transaction {
-            // Используем find для поиска записи по stId
-//            Stations.select(Stations.stId, *columns.toTypedArray())
-//                .where { Stations.stId eq stId }.singleOrNull()?.let { row ->
-
 
             Stations.selectAll().where { Stations.stId eq stId }.singleOrNull()?.let { row ->
-                // Преобразуем результат в объект Station
                 deserializeStation(row)
             }
         }
@@ -192,6 +191,50 @@ class PostgreeManager: DbManager {
             totalCount to filteredCount
         }
     }
+
+    private fun deserializePowerbank(row: ResultRow): Powerbank {
+        return Powerbank(
+            id = row[Powerbanks.id],
+            status = Powerbank.Status.valueOf(row[Powerbanks.status].toString())
+        )
+    }
+
+
+    override fun updatePowerbank(powerbank: Powerbank) {
+        transaction {
+            val existingPowerbank = Powerbanks.select(Powerbanks.id).where { Powerbanks.id eq powerbank.id }.singleOrNull()
+
+            if (existingPowerbank != null) {
+                Powerbanks.update({ Powerbanks.id eq powerbank.id }) {
+                    it[status] = powerbank.status
+                }
+            } else {
+                Powerbanks.insert {
+                    it[id] = powerbank.id
+                    it[status] = powerbank.status
+                }
+            }
+        }
+    }
+
+    override fun getPowerbankById(id: String): Powerbank? {
+        return transaction {
+            Powerbanks.selectAll().where { Powerbanks.id eq id }
+                .singleOrNull()
+                ?.let { row ->
+                    deserializePowerbank(row)
+                }
+        }
+    }
+
+    override fun getPowerbanksByIds(ids: List<String>): List<Powerbank> {
+        return transaction {
+            Powerbanks
+                .selectAll().where { Powerbanks.id inList ids }
+                .map { row -> deserializePowerbank(row) }
+        }
+    }
+
 
 
 

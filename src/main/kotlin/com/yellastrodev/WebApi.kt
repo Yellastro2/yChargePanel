@@ -5,6 +5,7 @@ import com.yellastrodev.CommandsManager.sendCommandToStation
 import com.yellastrodev.CommandsManager.setWallpaper
 import com.yellastrodev.databases.Station
 import com.yellastrodev.databases.database
+import com.yellastrodev.databases.entities.Powerbank
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
@@ -207,7 +208,26 @@ fun Application.configureWebApiRouting() {
                     val fStationJson = JSONObject().apply {
                         put(KEY_STATION_ID, fStation.stId)
                         put(KEY_SIZE, fStation.size)
-                        put(KEY_STATE, fStation.state)  // Уже JSONObject
+
+                        // Обновление state с информацией о блокировке банков
+                        val stateWithBlockedInfo = JSONObject(fStation.state.toString()) // Создаём копию state
+                        val bankIds = fStation.state.keys().asSequence()
+                            .mapNotNull { key -> fStation.state.getJSONObject(key).optString("bankId", null) }
+                            .toList()
+
+                        val powerbanks = database.getPowerbanksByIds(bankIds) // Получаем статусы банков из базы
+                        val blockedBankIds = powerbanks.filter { it.status == Powerbank.Status.BLOCKED }.map { it.id }.toSet()
+
+                        stateWithBlockedInfo.keys().forEach { slot ->
+                            val bank = stateWithBlockedInfo.getJSONObject(slot)
+                            val bankId = bank.optString(KEY_BANK_ID, null)
+                            if (bankId != null && blockedBankIds.contains(bankId)) {
+                                bank.put("blocked", true) // Добавляем ключ "blocked: true", если банк заблокирован
+                            }
+                        }
+
+                        put(KEY_STATE, stateWithBlockedInfo)
+
                         put(KEY_TIMESTAMP, fStation.timestamp)
                         put(KEY_TRAFFIC_LAST_DAY, fStation.lastDayTraffic)
                         // Проверяем наличие событий и добавляем их в JSON
@@ -228,6 +248,36 @@ fun Application.configureWebApiRouting() {
                 }
             }
 
+            get("/$ROUT_UPDATE_BANK_STATUS") {
+                try {
+                    // Получаем параметр bankId из запроса
+                    val params = extractParametersOrFail(call, listOf(KEY_BANK_ID)) { errorMessage ->
+                        call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                    } ?: return@get
+
+                    val bankId = params[KEY_BANK_ID]!!
+
+                    // Получаем текущий статус банка из базы данных
+                    val currentBank = database.getPowerbankById(bankId)
+                        ?: Powerbank(bankId, Powerbank.Status.AVAILABLE)
+                    // Меняем статус на противоположный
+                    currentBank.status = if (currentBank.status == Powerbank.Status.BLOCKED) {
+                        Powerbank.Status.AVAILABLE
+                    } else {
+                        Powerbank.Status.BLOCKED
+                    }
+
+                    // Обновляем статус банка в базе данных
+                    database.updatePowerbank(currentBank)
+
+                    call.respond(HttpStatusCode.OK, """{"status": "Bank status updated to ${currentBank.status.name}."}""")
+                } catch (e: Exception) {
+                    AppLogger.error(TAG, "An error occurred while updating bank status", e)
+                    call.respondText("An error occurred while processing your request.", status = HttpStatusCode.InternalServerError)
+                }
+            }
+
+
             get("/$ROUT_RELEASE") {
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, KEY_NUM)) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
@@ -236,14 +286,24 @@ fun Application.configureWebApiRouting() {
                 val stId = params[KEY_STATION_ID]!!
                 val num = params[KEY_NUM]!!.toInt()
 
-                val fStation = database.getStationById(stId)
-
-                fStation?.let {
-                    if (it.blockedSlots[num - 1] == Station.SlotStatus.BLOCKED) {
-                        call.respond(HttpStatusCode.OK, """{"status": "slot is blocked"}""")
-                        return@get
+                database.getStationById(stId)
+                    ?.let { fStation ->
+                        if (fStation.blockedSlots[num - 1] == Station.SlotStatus.BLOCKED) {
+                            call.respond(HttpStatusCode.OK, """{"status": "slot is blocked"}""")
+                            return@get
+                        }
+                        fStation.state.optJSONObject(num.toString(), null)
+                        ?. optString(KEY_BANK_ID) ?. let { fBankId ->
+                        database.getPowerbankById(fBankId)?.let {
+                            if (it.status == Powerbank.Status.BLOCKED) {
+                                call.respond(HttpStatusCode.OK, """{"status": "powerbank is blocked"}""")
+                                return@get
+                            }
+                        }
                     }
                 }
+
+
 
                 sendCommandToStation(stId, JSONObject(mapOf(CMD_RELEASE to num)))
                 call.respond(HttpStatusCode.OK, """{"status": "command released send"}""")

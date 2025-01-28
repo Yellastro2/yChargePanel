@@ -19,6 +19,7 @@ val KEY_NUM = "num"
 val KEY_PATH = "path"
 val KEY_TEXT = "text"
 val KEY_AVAIBLE = "available"
+val KEY_BANK_ID = "bankId"
 
 val EVENT_TYPE = "type"
 
@@ -60,6 +61,7 @@ val ROUT_RELEASE = "release"
 val ROUT_FORCE = "force"
 val ROUT_BLOCK_SLOT = "block_slot"
 val ROUT_STATION = "/station"
+val ROUT_UPDATE_BANK_STATUS = "updateBankStatus"
 
 val PATH_BASE = "uploads"
 val PATH_WALLPAPERS = "${PATH_BASE}/wallpapers"

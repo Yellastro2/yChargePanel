@@ -1,5 +1,6 @@
 package com.yellastrodev.databases
 
+import com.yellastrodev.databases.entities.Powerbank
 import org.json.JSONObject
 
 val database: DbManager = PostgreeManager()
@@ -22,5 +23,13 @@ interface DbManager {
      */
     fun getStationCount(fTimestamp: Int = 0): Pair<Int, Int>
 
+
+    fun updatePowerbank(powerbank: Powerbank)
+    fun getPowerbankById(id: String): Powerbank?
+
+    /**
+     * Возвращает список объектов Powerbank по их ID
+     */
+    fun getPowerbanksByIds(ids: List<String>): List<Powerbank>
 
 }

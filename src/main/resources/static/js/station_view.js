@@ -77,9 +77,32 @@ document.addEventListener('DOMContentLoaded', function() {
             // Проверка наличия данных в объекте state
             const stateData = state[i];
 
+
             const bankIdCell = document.createElement('td');
-            bankIdCell.textContent = stateData ? stateData.bankId : '';
             row.appendChild(bankIdCell);
+
+            if (stateData){
+
+
+                bankIdCell.textContent = stateData.bankId;
+
+                // Добавляем кнопку для статуса банка
+                const bankStatusButton = document.createElement('button');
+                const bankStatus = stateData ? stateData.blocked : 'UNBLOCKED'; // Предполагаем, что статус банка передается как строка "BLOCKED" или "UNBLOCKED"
+
+                if (stateData && stateData.blocked) {
+                    bankStatusButton.className = 'btn btn-danger';
+                    bankStatusButton.textContent = 'Забанен';
+                } else {
+                    bankStatusButton.className = 'btn btn-success';
+                    bankStatusButton.textContent = 'Доступен';
+                }
+
+                bankStatusButton.onclick = () => blockBank(currentHost, stateData.bankId);
+
+                bankIdCell.appendChild(bankStatusButton);
+            }
+
 
             const chargeCell = document.createElement('td');
             chargeCell.textContent = stateData ? stateData.charge : '';
@@ -90,6 +113,8 @@ document.addEventListener('DOMContentLoaded', function() {
             row.appendChild(statusCell);
 
             const actionsCell = document.createElement('td');
+
+            actionsCell.className = 'status-container';
             const openButton = document.createElement('button');
             openButton.className = 'btn btn-primary';
             openButton.textContent = 'Открыть';
@@ -103,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
             actionsCell.appendChild(forceButton);
 
             const blockButton = document.createElement('button');
-            blockButton.textContent = blockedSlots[i - 1] === 0 ? 'Заблокировать' : 'Разблокировать';
+            blockButton.textContent = blockedSlots[i - 1] === 0 ? 'Доступен' : 'Заблочен';
             blockButton.className = blockedSlots[i - 1] === 0 ? 'btn btn-success' : 'btn btn-danger';
 
 //            blockButton.className = 'btn btn-primary';
@@ -212,3 +237,15 @@ function blockSlot(currentHost, stId, num) {
     })
         .catch(error => console.error('Error blocking slot:', error));
 }
+
+function blockBank(currentHost, bankId) {
+    const apiUrl = `${currentHost}/api/updateBankStatus?bankId=${bankId}`;
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            console.log(data)
+        //            alert(`Слот ${num} открыт: ${data.status}`);
+    })
+        .catch(error => console.error('Error blocking bank:', error));
+}
+
