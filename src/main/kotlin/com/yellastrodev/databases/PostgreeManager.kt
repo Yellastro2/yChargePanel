@@ -10,12 +10,11 @@ import com.yellastrodev.databases.Stations.state
 import com.yellastrodev.databases.Stations.timestamp
 import com.yellastrodev.databases.Stations.wallpaper
 import com.yellastrodev.databases.entities.Powerbank
+import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.yLogger.AppLogger
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.statements.InsertStatement
-import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.json.JSONArray
 import org.json.JSONObject // Импортируем JSONObject, если используете библиотеку org.json
@@ -111,15 +110,15 @@ class PostgreeManager: DbManager {
         val jsonArray = JSONArray(row[Stations.blockedSlots])
 
         return Station(
-            stId = row[Stations.stId],
-            size = row[Stations.size],
-            lastDayTraffic = row[Stations.lastDayTraffic],
-            state = JSONObject(row[Stations.state]),
+            stId = row[stId],
+            size = row[size],
+            lastDayTraffic = row[lastDayTraffic],
+            state = JSONObject(row[state]),
             events = events,
-            timestamp = row[Stations.timestamp],
-            qrString = row[Stations.qrString],
-            wallpaper = row[Stations.wallpaper],
-            blockedSlots = Array(row[Stations.size]) { index ->
+            timestamp = row[timestamp],
+            qrString = row[qrString],
+            wallpaper = row[wallpaper],
+            blockedSlots = Array(row[size]) { index ->
                 Station.SlotStatus.valueOf(jsonArray.optString(index, Station.SlotStatus.UNBLOCKED.toString())) // Десериализация в массив SlotStatus
             }
         )

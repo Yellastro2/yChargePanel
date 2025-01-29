@@ -1,7 +1,9 @@
 package com.yellastrodev
 
+import com.yellastrodev.CommandsManager.resetStationTimer
+import com.yellastrodev.CommandsManager.runStationDisconnectTimer
 import com.yellastrodev.CommandsManager.waitForEventOrTimeout
-import com.yellastrodev.databases.Station
+import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.databases.database
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
@@ -13,13 +15,32 @@ import io.ktor.server.routing.*
 import org.json.JSONArray
 import org.json.JSONObject
 
+val MAX_EVENTS_SIZE = 100
+
+/**
+ * Добавляем эвент в станцию, связанный с бэкендом - онлай\офлайн итп.
+ * не использовать для эвентов связанных с слотами\банками
+ */
+fun addEventToStation(stId: String, eventJson: JSONObject) {
+    val station = database.getStationById(stId) ?: return  // Если станция не найдена, возвращаем false
+    var isUpdated = false
+
+    // Добавляем эвент в список станции
+    station.events.add(eventJson)
+    while (station.events.size > MAX_EVENTS_SIZE)
+        station.events.removeAt(0)
+
+    database.updateStation(station)
+
+}
+
 
 
 fun Application.configureStationRouting() {
 
     val TAG = "StationApi"
 
-    val MAX_EVENTS_SIZE = 100
+
 
 
 
@@ -37,9 +58,10 @@ fun Application.configureStationRouting() {
             route("/stationApi") {
                 get("/$ROUT_CHECKIN") {
 //                    val jedis = jedisPool.resource
+                    var stId: String? = null
                     try {
                         AppLogger.debug(TAG, "Checkin ${call.request.rawQueryParameters}")
-                        val stId = call.request.queryParameters[KEY_STATION_ID]
+                        stId = call.request.queryParameters[KEY_STATION_ID]
                         val size = call.request.queryParameters[KEY_SIZE]?.toInt()
                         var state = call.request.queryParameters[KEY_STATE]
                         val timeoutHeader = call.request.headers[KEY_TIMEOUT]?.toIntOrNull()
@@ -49,6 +71,7 @@ fun Application.configureStationRouting() {
                         AppLogger.info(TAG, "timeout header: $timeoutHeader")
 
                         if (stId != null && timeoutHeader != null) {
+                            resetStationTimer(stId)
                             val timestamp = (System.currentTimeMillis() / 1000).toInt()
 //                            AppLogger.info(TAG, "Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
 
@@ -188,6 +211,7 @@ fun Application.configureStationRouting() {
                             AppLogger.info(TAG,"send responce to $stId: $response")
 
                             call.respond(HttpStatusCode.OK, response.toString())
+
                         } else {
                             AppLogger.warn(TAG,"Missing or invalid query parameters")
                             call.respond(HttpStatusCode.BadRequest, "Missing or invalid query parameters")
@@ -196,7 +220,7 @@ fun Application.configureStationRouting() {
                     } catch (e: Exception) {
                         AppLogger.error(TAG, "An error occurred", e)
                     } finally {
-//                        jedis.close()
+                        stId?.let { runStationDisconnectTimer(stId) }
                     }
                 }
             }

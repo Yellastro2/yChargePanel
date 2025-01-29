@@ -3,7 +3,7 @@ package com.yellastrodev
 import com.yellastrodev.CommandsManager.isClientConnected
 import com.yellastrodev.CommandsManager.sendCommandToStation
 import com.yellastrodev.CommandsManager.setWallpaper
-import com.yellastrodev.databases.Station
+import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.databases.database
 import com.yellastrodev.databases.entities.Powerbank
 import com.yellastrodev.yLogger.AppLogger

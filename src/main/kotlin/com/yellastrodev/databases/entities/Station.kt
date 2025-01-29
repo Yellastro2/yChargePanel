@@ -1,4 +1,4 @@
-package com.yellastrodev.databases
+package com.yellastrodev.databases.entities
 
 import org.json.JSONObject
 

@@ -30,6 +30,7 @@ val EVENT_CHARGE = "charge"
 val EVENT_SOME = "some"
 val EVENT_MOTOR_STATE = "motor_state"
 val EVENT_SLOTSTIL_BROKE = "slot_stilbroke"
+val EVENT_CONNECTION = "connection"
 
 
 val EVENT_CHARGE_OLD = "oldCharge"

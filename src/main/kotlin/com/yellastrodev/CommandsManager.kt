@@ -3,10 +3,11 @@ package com.yellastrodev
 import com.yellastrodev.databases.database
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.CMD_CHANGE_WALLPAPER
+import com.yellastrodev.ymtserial.EVENT_CONNECTION
+import com.yellastrodev.ymtserial.EVENT_TYPE
+import kotlinx.coroutines.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.future.await
 import org.json.JSONObject
 import java.util.concurrent.CancellationException
@@ -15,6 +16,8 @@ import java.util.concurrent.TimeoutException
 object CommandsManager {
 
     val TAG = "CommandsManager"
+
+    val DISCONNECT_TIMEOUT = 5 * 1000L
 
     val waitMap: ConcurrentHashMap<String, CompletableFuture<JSONObject?>> = ConcurrentHashMap()
 
@@ -77,4 +80,40 @@ object CommandsManager {
     fun isClientConnected(stId: String): Boolean {
         return waitMap.containsKey(stId)
     }
+
+    val stationTimers = ConcurrentHashMap<String, Job>()
+
+    fun runStationDisconnectTimer(stId: String) {
+//        resetStationTimer(stId)
+        stationTimers[stId]?.cancel()
+        stationTimers[stId] = CoroutineScope(Dispatchers.IO).launch {
+            delay(DISCONNECT_TIMEOUT) // Ожидание 5 секунд
+            AppLogger.warn(TAG, "Станция $stId потеряла соединение!")
+            val fEvent = JSONObject()
+
+            fEvent.put("date", System.currentTimeMillis())
+            fEvent.put(EVENT_TYPE, EVENT_CONNECTION)
+            fEvent.put(EVENT_CONNECTION, "disconnect")
+
+            addEventToStation(stId, fEvent)
+            stationTimers.remove(stId)
+        }
+    }
+
+    fun resetStationTimer(stId: String) {
+
+        stationTimers[stId]?.cancel() // Отменяем старый таймер, если есть
+            ?: run {
+                AppLogger.warn(TAG, "Станция $stId восстановила соединение!")
+                val fEvent = JSONObject()
+
+                fEvent.put("date", System.currentTimeMillis())
+                fEvent.put(EVENT_TYPE, EVENT_CONNECTION)
+                fEvent.put(EVENT_CONNECTION, "connect restored")
+
+                addEventToStation(stId, fEvent)
+            }
+        stationTimers.remove(stId)
+    }
+
 }

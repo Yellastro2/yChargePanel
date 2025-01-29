@@ -1,7 +1,7 @@
 package com.yellastrodev.databases
 
 import com.yellastrodev.databases.entities.Powerbank
-import org.json.JSONObject
+import com.yellastrodev.databases.entities.Station
 
 val database: DbManager = PostgreeManager()
 
