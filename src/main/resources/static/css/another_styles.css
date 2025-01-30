@@ -48,3 +48,21 @@
 .status-button:hover {
     background-color: #e0e0e0;
 }
+
+#layout_top {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+}
+
+.left-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Расстояние между элементами */
+}
+
+.right-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}

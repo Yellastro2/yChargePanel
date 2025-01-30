@@ -56,22 +56,29 @@ val ROUT_STATIONINFO = "stationInfo"
 val ROUT_STATIONLIST = "stationList"
 val ROUT_GET_LOGS = "getLogs"
 val ROUT_SET_QR = "setQR"
-val ROUT_UPLOAD_WALLPAPER = "upload"
+val ROUT_UPLOAD_FILE_FORSTATION = "upload"
+val WALLPAPER_ROUT = "wallpaper"
+val APK_ROUT = "apk"
+
 val ROUT_DOWNLOAD = "download"
 val ROUT_RELEASE = "release"
 val ROUT_FORCE = "force"
 val ROUT_BLOCK_SLOT = "block_slot"
 val ROUT_STATION = "/station"
 val ROUT_UPDATE_BANK_STATUS = "updateBankStatus"
+val ROUT_REBOOT = "reboot"
 
 val PATH_BASE = "uploads"
 val PATH_WALLPAPERS = "${PATH_BASE}/wallpapers"
+val PATH_APK = "${PATH_BASE}/apks"
 
 val CMD_RELEASE = "release"
 val CMD_FORCE = "force"
 val CMD_GETLOGS = "getLogs"
 val CMD_CHANGE_WALLPAPER = "wallpaper"
 val CMD_CHANGE_QR = "QR_data"
+val CMD_REBOOT = "reboot"
+val CMD_UPDATE_APK = "update_apk"
 
 
 val logFileDateFormat = SimpleDateFormat("yyyy.MM.dd_HH-mm-ss", Locale.getDefault())

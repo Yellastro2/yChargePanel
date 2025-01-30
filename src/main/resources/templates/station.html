@@ -22,22 +22,31 @@
                         <div class="card-body">
                             <div class="datatable-wrapper datatable-loading no-footer sortable searchable fixed-columns">
                                 <div id="layout_top" class="datatable-top">
+                                    <!-- Левая колонка -->
+                                    <div class="left-section">
+                                        <div id="station_name" class="station_name"></div>
+                                        <button id="stations_log_button" type="button" class="btn btn-primary">Логи</button>
 
-                                    <div id="station_name" class="station_name"></div>
+                                        <form id="uploadForm" action="/api/upload/${stId}" method="post" enctype="multipart/form-data">
+                                            <input type="file" name="image" accept="image/*" required>
+                                            <button type="submit">Загрузить</button>
+                                        </form>
 
-                                    <button id="stations_log_button" type="button" class="btn btn-primary" >Логи</button>
+                                        <form id="changeQR" action="/api/setQR" method="post">
+                                            <label for="textInput">Поменять QR:</label>
+                                            <input type="text" id="textInput" name="text" required>
+                                            <button type="submit">Отправить</button>
+                                        </form>
+                                    </div>
 
-                                    <form id="uploadForm" action="/api/upload/${stId}" method="post" enctype="multipart/form-data">
-                                        <input type="file" name="image" accept="image/*" required>
-                                        <button type="submit">Загрузить</button>
-                                    </form>
-
-                                    <form id="changeQR" action="/api/setQR" method="post">
-                                        <label for="textInput">Поменять QR:</label>
-                                        <input type="text" id="textInput" name="text" required>
-                                        <button type="submit">Отправить</button>
-                                    </form>
+                                    <!-- Правая колонка -->
+                                    <div class="right-section">
+                                        <button id="btn_reboot" class="btn btn-secondary">Перезагрузка</button><br>
+                                        <button id="btn_disable" class="btn btn-secondary">Отключить станцию</button><br>
+                                        <button class="btn btn-secondary">Кнопка 3</button>
+                                    </div>
                                 </div>
+
                                 <div class="datatable-container">
                                     <table id="datatablesSimple" class="datatable-table">
                                         <thead>

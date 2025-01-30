@@ -62,6 +62,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const qrForm = document.getElementById('changeQR');
         qrForm.action = `/api/setQR/${stId}`;
 
+        document.getElementById('btn_reboot').onclick = () => rebootStation(currentHost, stId);
+        document.getElementById('btn_disable').onclick = () => disableStation(currentHost, stId);
+
         const blockedSlots = data.blockedSlots
 
 
@@ -204,48 +207,44 @@ function getLogs(currentHost, stId) {
         .catch(error => console.error('Error getting logs:', error));
 }
 
-function forceSlot(currentHost, stId, num) {
-    const apiUrl = `${currentHost}/api/force?stId=${stId}&num=${num}`;
+function baseRequest(apiUrl) {
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {
-            console.log(data)
+        console.log(data)
         //            alert(`Слот ${num} открыт: ${data.status}`);
     })
-        .catch(error => console.error('Error forcing slot:', error));
+        .catch(error => console.error('Error ${apiUrl}:', error));
+}
+
+function forceSlot(currentHost, stId, num) {
+    const apiUrl = `${currentHost}/api/force?stId=${stId}&num=${num}`;
+    baseRequest(apiUrl)
 }
 
 
 function releaseSlot(currentHost, stId, num) {
     const apiUrl = `${currentHost}/api/release?stId=${stId}&num=${num}`;
-    fetch(apiUrl)
-        .then(response => response.json())
-        .then(data => {
-            console.log(data)
-//            alert(`Слот ${num} открыт: ${data.status}`);
-        })
-        .catch(error => console.error('Error releasing slot:', error));
+    baseRequest(apiUrl)
 }
 
 function blockSlot(currentHost, stId, num) {
     const apiUrl = `${currentHost}/api/block_slot?stId=${stId}&num=${num}`;
-    fetch(apiUrl)
-        .then(response => response.json())
-        .then(data => {
-            console.log(data)
-        //            alert(`Слот ${num} открыт: ${data.status}`);
-    })
-        .catch(error => console.error('Error blocking slot:', error));
+    baseRequest(apiUrl)
 }
 
 function blockBank(currentHost, bankId) {
     const apiUrl = `${currentHost}/api/updateBankStatus?bankId=${bankId}`;
-    fetch(apiUrl)
-        .then(response => response.json())
-        .then(data => {
-            console.log(data)
-        //            alert(`Слот ${num} открыт: ${data.status}`);
-    })
-        .catch(error => console.error('Error blocking bank:', error));
+    baseRequest(apiUrl)
+}
+
+function disableStation(currentHost, stId) {
+    const apiUrl = `${currentHost}/api/disableStation?stId=${stId}`;
+    baseRequest(apiUrl)
+}
+
+function rebootStation(currentHost, stId) {
+    const apiUrl = `${currentHost}/api/reboot?stId=${stId}`;
+    baseRequest(apiUrl)
 }
 

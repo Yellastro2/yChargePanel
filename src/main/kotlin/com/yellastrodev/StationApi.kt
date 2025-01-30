@@ -168,14 +168,15 @@ fun Application.configureStationRouting() {
                                     isUpdated = true
                                     fStation.state = JSONObject(it)
                                 }
-                                val fields = "{}" //jedis.hgetAll(key) TODO
-                                val stateJSON = JSONObject(fields)
-                                if (stateJSON.has(CMD_CHANGE_WALLPAPER))
-                                    onlineState = JSONObject(
-                                        mapOf(CMD_CHANGE_WALLPAPER to stateJSON.getString(CMD_CHANGE_WALLPAPER))
-                                    )
-                                if (stateJSON.has(CMD_CHANGE_QR))
-                                    onlineState.put(CMD_CHANGE_QR, stateJSON.get(CMD_CHANGE_QR))
+                                val fWallpaper = if (fStation.wallpaper.isNotEmpty()) fStation.wallpaper
+                                    else DEFAULT_IMAGE
+
+//                                if (stateJSON.has(CMD_CHANGE_WALLPAPER))
+                                onlineState = JSONObject(
+                                    mapOf(CMD_CHANGE_WALLPAPER to fWallpaper)
+                                )
+                                if (fStation.qrString.isNotEmpty())
+                                    onlineState.put(CMD_CHANGE_QR, fStation.qrString)
                             }
 
                             val exists = false
@@ -209,6 +210,7 @@ fun Application.configureStationRouting() {
                             }
 
                             AppLogger.info(TAG,"send responce to $stId: $response")
+
 
                             call.respond(HttpStatusCode.OK, response.toString())
 

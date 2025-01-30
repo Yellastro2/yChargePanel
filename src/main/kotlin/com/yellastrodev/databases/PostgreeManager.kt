@@ -7,6 +7,7 @@ import com.yellastrodev.databases.Stations.qrString
 import com.yellastrodev.databases.Stations.size
 import com.yellastrodev.databases.Stations.stId
 import com.yellastrodev.databases.Stations.state
+import com.yellastrodev.databases.Stations.status
 import com.yellastrodev.databases.Stations.timestamp
 import com.yellastrodev.databases.Stations.wallpaper
 import com.yellastrodev.databases.entities.Powerbank
@@ -30,12 +31,14 @@ object Stations : Table() {
     val qrString = text("qrString",).default("") // Новое поле для qrString
     val wallpaper = text("wallpaper").default("") // Новое поле для wallpaper
     val blockedSlots = text("blockedSlots").default("[]")
+    val status = enumerationByName("status", 50, Station.Status::class)
+
     override val primaryKey = PrimaryKey(stId, name = "PK_Stations_stId")
 }
 
 object Powerbanks : Table() {
     val id = varchar("id", 255) // Идентификатор повербанка
-    val status = enumerationByName("status", 50, Powerbank.Status::class) // Статус повербанка
+    val status = enumerationByName("status", 50, Station.Status::class) // Статус повербанка
 
     override val primaryKey = PrimaryKey(id, name = "PK_Powerbanks_id")
 }
@@ -93,6 +96,7 @@ class PostgreeManager: DbManager {
         updateStatement[qrString] = station.qrString // Обновляем поле qrString
         updateStatement[wallpaper] = station.wallpaper // Обновляем поле wallpaper
         updateStatement[blockedSlots] = JSONArray(station.blockedSlots.map { it.name }).toString()
+        updateStatement[status] = station.status
     }
 
     fun deserializeStation(row: ResultRow): Station {
@@ -119,8 +123,9 @@ class PostgreeManager: DbManager {
             qrString = row[qrString],
             wallpaper = row[wallpaper],
             blockedSlots = Array(row[size]) { index ->
-                Station.SlotStatus.valueOf(jsonArray.optString(index, Station.SlotStatus.UNBLOCKED.toString())) // Десериализация в массив SlotStatus
-            }
+                Station.Status.valueOf(jsonArray.optString(index, Station.Status.AVAILABLE.toString())) // Десериализация в массив SlotStatus
+            },
+            status = row[status]
         )
     }
 
@@ -194,7 +199,7 @@ class PostgreeManager: DbManager {
     private fun deserializePowerbank(row: ResultRow): Powerbank {
         return Powerbank(
             id = row[Powerbanks.id],
-            status = Powerbank.Status.valueOf(row[Powerbanks.status].toString())
+            status = row[Powerbanks.status] //Station.Status.valueOf(row[Powerbanks.status].toString())
         )
     }
 

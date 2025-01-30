@@ -3,6 +3,7 @@ package com.yellastrodev
 import com.yellastrodev.CommandsManager.isClientConnected
 import com.yellastrodev.CommandsManager.sendCommandToStation
 import com.yellastrodev.CommandsManager.setWallpaper
+import com.yellastrodev.CommandsManager.updateAPK
 import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.databases.database
 import com.yellastrodev.databases.entities.Powerbank
@@ -33,10 +34,6 @@ fun Application.configureWebApiRouting() {
     val uploadLogsCallbacks = mutableMapOf<String, CompletableFuture<Unit>>()
 
     val TAG = "WebApiRouting"
-    val TIMEOUT_LOG_UPLOAD = 60L
-    val ONLINE_SECONDS = 60 * 3
-
-    val DEFAULT_IMAGE = "1.jpg"
 
     install(ContentNegotiation) {
         json(Json {
@@ -48,12 +45,24 @@ fun Application.configureWebApiRouting() {
     routing {
         route("/api") {
 
-            post("/$ROUT_UPLOAD_WALLPAPER/{$KEY_STATION_ID}") {
-                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID)) { errorMessage ->
+            post("/$ROUT_UPLOAD_FILE_FORSTATION/{fileType}/{$KEY_STATION_ID}") {
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, "fileType")) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
                 } ?: return@post
+
                 val stId = params[KEY_STATION_ID]!!
-                val uploadDir = File(PATH_WALLPAPERS)
+                val fileType = params["fileType"]!!
+
+                // Определение папки для сохранения файла в зависимости от fileType
+                val (uploadDir, fFileType) = when (fileType) {
+                    WALLPAPER_ROUT -> File(PATH_WALLPAPERS) to "jpg"  // для обоев
+                    APK_ROUT -> File(PATH_APK) to "apk"               // для APK
+                    else -> {
+                        call.respondText("Invalid file type", status = HttpStatusCode.BadRequest)
+                        return@post
+                    }
+                }
+
                 if (!uploadDir.exists()) {
                     uploadDir.mkdirs()
                 }
@@ -62,7 +71,7 @@ fun Application.configureWebApiRouting() {
                 val maxFileNumber = uploadDir.listFiles()?.mapNotNull {
                     it.name.substringBeforeLast(".").toIntOrNull()
                 }?.maxOrNull() ?: 0
-                val newFileName = "${maxFileNumber + 1}.jpg"
+                val newFileName = "${maxFileNumber + 1}.$fFileType" // для wallpaper, для apk можно изменить расширение
 
                 val multipart = call.receiveMultipart()
                 multipart.forEachPart { part ->
@@ -73,10 +82,16 @@ fun Application.configureWebApiRouting() {
                     part.dispose()
                 }
 
-                setWallpaper(stId, newFileName)
+                // Вызов нужного метода в зависимости от fileType
+                if (fileType == WALLPAPER_ROUT) {
+                    setWallpaper(stId, newFileName)
+                } else if (fileType == APK_ROUT) {
+                    updateAPK(stId, newFileName)
+                }
 
                 call.respondRedirect("/station/${stId}")
             }
+
 
 
             post("/$ROUT_SET_QR/{stId}") {
@@ -216,7 +231,7 @@ fun Application.configureWebApiRouting() {
                             .toList()
 
                         val powerbanks = database.getPowerbanksByIds(bankIds) // Получаем статусы банков из базы
-                        val blockedBankIds = powerbanks.filter { it.status == Powerbank.Status.BLOCKED }.map { it.id }.toSet()
+                        val blockedBankIds = powerbanks.filter { it.status == Station.Status.BLOCKED }.map { it.id }.toSet()
 
                         stateWithBlockedInfo.keys().forEach { slot ->
                             val bank = stateWithBlockedInfo.getJSONObject(slot)
@@ -236,7 +251,7 @@ fun Application.configureWebApiRouting() {
                         } else {
                             put(KEY_EVENT, JSONArray())  // Если событий нет, добавляем пустой массив
                         }
-                        val blockedSlotsState = fStation.blockedSlots.map { if (it == Station.SlotStatus.BLOCKED) 1 else 0 }
+                        val blockedSlotsState = fStation.blockedSlots.map { if (it == Station.Status.BLOCKED) 1 else 0 }
 
                         put("blockedSlots", JSONArray(blockedSlotsState))
 
@@ -259,12 +274,12 @@ fun Application.configureWebApiRouting() {
 
                     // Получаем текущий статус банка из базы данных
                     val currentBank = database.getPowerbankById(bankId)
-                        ?: Powerbank(bankId, Powerbank.Status.AVAILABLE)
+                        ?: Powerbank(bankId, Station.Status.AVAILABLE)
                     // Меняем статус на противоположный
-                    currentBank.status = if (currentBank.status == Powerbank.Status.BLOCKED) {
-                        Powerbank.Status.AVAILABLE
+                    currentBank.status = if (currentBank.status == Station.Status.BLOCKED) {
+                        Station.Status.AVAILABLE
                     } else {
-                        Powerbank.Status.BLOCKED
+                        Station.Status.BLOCKED
                     }
 
                     // Обновляем статус банка в базе данных
@@ -288,14 +303,14 @@ fun Application.configureWebApiRouting() {
 
                 database.getStationById(stId)
                     ?.let { fStation ->
-                        if (fStation.blockedSlots[num - 1] == Station.SlotStatus.BLOCKED) {
+                        if (fStation.blockedSlots[num - 1] == Station.Status.BLOCKED) {
                             call.respond(HttpStatusCode.OK, """{"status": "slot is blocked"}""")
                             return@get
                         }
                         fStation.state.optJSONObject(num.toString(), null)
                         ?. optString(KEY_BANK_ID) ?. let { fBankId ->
                         database.getPowerbankById(fBankId)?.let {
-                            if (it.status == Powerbank.Status.BLOCKED) {
+                            if (it.status == Station.Status.BLOCKED) {
                                 call.respond(HttpStatusCode.OK, """{"status": "powerbank is blocked"}""")
                                 return@get
                             }
@@ -321,6 +336,17 @@ fun Application.configureWebApiRouting() {
                 call.respond(HttpStatusCode.OK, """{"status": "command force released send"}""")
             }
 
+            get("/$ROUT_REBOOT") {
+                val params = extractParametersOrFail(call, listOf(KEY_STATION_ID)) { errorMessage ->
+                    call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                } ?: return@get
+
+                val stId = params[KEY_STATION_ID]!!
+
+                sendCommandToStation(stId, JSONObject(mapOf(CMD_REBOOT to "1")))
+                call.respond(HttpStatusCode.OK, """{"status": "command reboot send"}""")
+            }
+
             get("/$ROUT_BLOCK_SLOT") {
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, KEY_NUM)) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
@@ -333,7 +359,7 @@ fun Application.configureWebApiRouting() {
 
                 fStation?.let {
                     fStation.blockedSlots[num] = fStation.blockedSlots[num].let {
-                        if (it == Station.SlotStatus.BLOCKED) Station.SlotStatus.UNBLOCKED else Station.SlotStatus.BLOCKED
+                        if (it == Station.Status.BLOCKED) Station.Status.AVAILABLE else Station.Status.BLOCKED
                     }
                     database.updateStation(fStation)
                     val fResult = fStation.blockedSlots[num].toString()

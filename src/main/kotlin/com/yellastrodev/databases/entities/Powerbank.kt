@@ -2,10 +2,6 @@ package com.yellastrodev.databases.entities
 
 data class Powerbank(
     val id: String,
-    var status: Status
+    var status: Station.Status
 ) {
-    enum class Status {
-        AVAILABLE,
-        BLOCKED
-    }
 }

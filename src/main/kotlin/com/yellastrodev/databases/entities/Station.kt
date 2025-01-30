@@ -14,7 +14,7 @@ import org.json.JSONObject
  * @property events Список событий, связанных со станцией.
  * @property timestamp Метка времени в секундах.
  * @property qrString Строка QR-кода для станции.
- * @property wallpaper Имя файла обоев в папке wallpaper.
+ * @property wallpaper Имя файла обоев в папке uploads/wallpaper.
  * @property blockedSlots Побитовое представление массива заблокированных слотов. 0x1 = заблокирован.
  */
 data class Station(
@@ -26,12 +26,14 @@ data class Station(
     var timestamp: Int = 0,
     var qrString: String = "",
     var wallpaper: String = "",
-    var blockedSlots: Array<SlotStatus> = Array(size) { SlotStatus.UNBLOCKED }
+    var blockedSlots: Array<Status> = Array(size) { Status.AVAILABLE },
+    var status: Status = Status.AVAILABLE
 )
 {
 
-    enum class SlotStatus {
+
+    enum class Status {
         BLOCKED,
-        UNBLOCKED
+        AVAILABLE
     }
 }

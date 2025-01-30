@@ -3,6 +3,7 @@ package com.yellastrodev
 import com.yellastrodev.databases.database
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.CMD_CHANGE_WALLPAPER
+import com.yellastrodev.ymtserial.CMD_UPDATE_APK
 import com.yellastrodev.ymtserial.EVENT_CONNECTION
 import com.yellastrodev.ymtserial.EVENT_TYPE
 import kotlinx.coroutines.*
@@ -33,7 +34,15 @@ object CommandsManager {
                 sendCommandToStation(stId,JSONObject(mapOf(CMD_CHANGE_WALLPAPER to newFileName)))
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.error(TAG, "Error setWallpaper: ${e.message}", e)
+        }
+    }
+
+    fun updateAPK(stId: String, newFileName: String) {
+        try {
+            sendCommandToStation(stId,JSONObject(mapOf(CMD_UPDATE_APK to newFileName)))
+        } catch (e: Exception) {
+            AppLogger.error(TAG, "Error updateAPK: ${e.message}", e)
         }
     }
 
@@ -51,8 +60,10 @@ object CommandsManager {
                 future.await()
             }
         } catch (e: TimeoutCancellationException) {
+            AppLogger.info(TAG, "TimeoutCancellationException ")
             null
         } catch (e: TimeoutException) {
+            AppLogger.info(TAG, "TimeoutException ")
             null
         } catch (e: CancellationException){
             AppLogger.info(TAG, "CancellationException cuz longpool timeout future cancelled")
