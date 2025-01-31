@@ -1,5 +1,8 @@
 package com.yellastrodev.yLogger
 
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException
@@ -41,17 +44,22 @@ class Logger(private val maxFileSize: Long = 1024 * 1024) { // 1 MB по умо�
         customHandlers.forEach { it(logMessage) }
     }
 
-    private val logLock = Any()
+//    private val logLock = Any()
+    private val mutex = Mutex()
 
     private fun logToFile(message: String) {
-        rotateLogFileIfNeeded()
-        synchronized(logLock) {
-            try {
-                val writer = FileWriter(logFile, true)
-                writer.append(message).append("\n")
-                writer.close()
-            } catch (e: IOException) {
-                e.printStackTrace()
+
+//        synchronized(logLock) {
+        runBlocking {
+            mutex.withLock {
+                try {
+                    rotateLogFileIfNeeded()
+                    val writer = FileWriter(logFile, true)
+                    writer.append(message).append("\n")
+                    writer.close()
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                }
             }
         }
     }

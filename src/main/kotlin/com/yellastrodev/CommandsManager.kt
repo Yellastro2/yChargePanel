@@ -6,21 +6,27 @@ import com.yellastrodev.ymtserial.CMD_CHANGE_WALLPAPER
 import com.yellastrodev.ymtserial.CMD_UPDATE_APK
 import com.yellastrodev.ymtserial.EVENT_CONNECTION
 import com.yellastrodev.ymtserial.EVENT_TYPE
+import io.ktor.http.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.coroutines.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
-import java.util.concurrent.CancellationException
+import java.io.Writer
 import java.util.concurrent.TimeoutException
 
 object CommandsManager {
 
     val TAG = "CommandsManager"
 
-    val DISCONNECT_TIMEOUT = 5 * 1000L
+    val DISCONNECT_TIMEOUT = 10 * 1000L
 
     val waitMap: ConcurrentHashMap<String, CompletableFuture<JSONObject?>> = ConcurrentHashMap()
+    val checkMap: ConcurrentHashMap<String, Job> = ConcurrentHashMap()
 
     fun setWallpaper(stId: String, newFileName: String) {
         // поменять значение обоев в базе данных + отправить команду станции о смене обоев.
@@ -46,18 +52,54 @@ object CommandsManager {
         }
     }
 
-    suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JSONObject? {
+    fun cleanLongPool(stId: String) {
+        checkMap[stId]?.cancel()
+        waitMap.remove(stId)
+        checkMap.remove(stId)
+    }
+
+    suspend fun waitForEventOrTimeout(writer: Writer?, stId: String, timeout: Int): JSONObject? {
         // проверяем в очереди команд наличие ожидающих - если есть, отправляем самую старую, из очереди удаляем.
         if (commandPoolMap.containsKey(stId) && commandPoolMap[stId]!!.size > 0)
             return commandPoolMap[stId]!!.removeAt(0)
-
+        checkMap[stId]?.cancel()
         // создаем пустую фьючу с ожиданием как на таймауте лонгпула, помещаем ее в мапу по ключу айди станции
         // потом можно эту фьючу найти в этой мапе и завершить командой. или она выкинет таймаут по истечении.
         val future = waitMap.computeIfAbsent(stId) { CompletableFuture<JSONObject?>() }
         return try {
+            val fTimeout = (if (timeout > 10) timeout - 5 else 0)
+            AppLogger.debug(TAG, "waitForEventOrTimeout start fTimeout: $fTimeout")
             // если таймаут стоит меньше 10 секунд, значит это запрос на первое подключение и нужно сразу же ответить что серв на связи
-            withTimeoutOrNull((if (timeout > 10) timeout - 5 else 0).toLong() * 1000) {
-                future.await()
+            withTimeoutOrNull( fTimeout * 1000L) {
+
+                // Создаём корутину для периодической проверки
+                checkMap[stId] = launch(Dispatchers.IO) {
+                    while (isActive) {
+                        delay(1000) // Периодическая проверка (каждые 1 секунду)
+                        // Здесь добавляем свою проверку
+                        try {
+                            AppLogger.debug(TAG, "waitForEventOrTimeout checkJob write")
+                            writer?.write("_")
+                        } catch (e: Exception) {
+                            AppLogger.error(TAG, "Error checkJob: ${e.message}", e)
+                        }
+//                            if (someCondition()) {
+//                                // Если условие выполнено, можно завершить с успехом или выполнить другие действия
+//                                future.complete(JSONObject().apply { put("status", "checked") })
+//                                break // Прерываем цикл, так как условие выполнено
+//                            }
+                    }
+                }
+
+                // Ожидаем завершения future (с ожидаемым результатом или истечением таймаута)
+                val result = future.await()
+                checkMap[stId]?.cancel()
+                AppLogger.debug(TAG, "waitForEventOrTimeout future comlete")
+
+
+
+                 // После завершения future останавливаем проверку
+                return@withTimeoutOrNull result
             }
         } catch (e: TimeoutCancellationException) {
             AppLogger.info(TAG, "TimeoutCancellationException ")
@@ -70,6 +112,7 @@ object CommandsManager {
             return null
         }
         finally {
+            checkMap[stId]?.cancel()
             waitMap.remove(stId)
         }
     }
@@ -94,37 +137,54 @@ object CommandsManager {
 
     val stationTimers = ConcurrentHashMap<String, Job>()
 
-    fun runStationDisconnectTimer(stId: String) {
-//        resetStationTimer(stId)
-        stationTimers[stId]?.cancel()
-        stationTimers[stId] = CoroutineScope(Dispatchers.IO).launch {
-            delay(DISCONNECT_TIMEOUT) // Ожидание 5 секунд
-            AppLogger.warn(TAG, "Станция $stId потеряла соединение!")
-            val fEvent = JSONObject()
+    val mutex = Mutex()
 
-            fEvent.put("date", System.currentTimeMillis())
-            fEvent.put(EVENT_TYPE, EVENT_CONNECTION)
-            fEvent.put(EVENT_CONNECTION, "disconnect")
+    suspend fun runStationDisconnectTimer(stId: String) {
+        // Получаем блокировку, чтобы предотвратить параллельный доступ
+//        runBlocking {
+            mutex.withLock {
+                AppLogger.debug(TAG, "runStationDisconnectTimer stationTimers[$stId]?.cancel() ")
+                stationTimers[stId]?.cancel()
+                AppLogger.debug(TAG, "runStationDisconnectTimer run disconect timer ")
+                stationTimers[stId] = CoroutineScope(Dispatchers.IO).launch {
+                    AppLogger.debug(TAG, "runStationDisconnectTimer launch ")
+                    delay(DISCONNECT_TIMEOUT) // Ожидание 5 секунд
+                    stationTimers.remove(stId)
+                    AppLogger.warn(TAG, "Станция $stId ожидание прошло: ${this.isActive}")
+                    AppLogger.warn(TAG, "Станция $stId потеряла соединение!")
+                    val fEvent = JSONObject()
 
-            addEventToStation(stId, fEvent)
-            stationTimers.remove(stId)
-        }
+                    fEvent.put("date", System.currentTimeMillis())
+                    fEvent.put(EVENT_TYPE, EVENT_CONNECTION)
+                    fEvent.put(EVENT_CONNECTION, "disconnect")
+
+                    addEventToStation(stId, fEvent)
+
+                }
+            }
+//        }
     }
 
-    fun resetStationTimer(stId: String) {
+    suspend fun resetStationTimer(stId: String) {
+        AppLogger.debug(TAG, "resetStationTimer stationTimers[$stId]?.cancel() \n" +
+                "${stationTimers.containsKey(stId)}")
+        cleanLongPool(stId)
+        mutex.withLock {
+            AppLogger.debug(TAG, "resetStationTimer withLock")
 
-        stationTimers[stId]?.cancel() // Отменяем старый таймер, если есть
-            ?: run {
-                AppLogger.warn(TAG, "Станция $stId восстановила соединение!")
-                val fEvent = JSONObject()
+            stationTimers[stId]?.cancel() // Отменяем старый таймер, если есть
+                ?: run {
+                    AppLogger.warn(TAG, "Станция $stId восстановила соединение!")
+                    val fEvent = JSONObject()
 
-                fEvent.put("date", System.currentTimeMillis())
-                fEvent.put(EVENT_TYPE, EVENT_CONNECTION)
-                fEvent.put(EVENT_CONNECTION, "connect restored")
+                    fEvent.put("date", System.currentTimeMillis())
+                    fEvent.put(EVENT_TYPE, EVENT_CONNECTION)
+                    fEvent.put(EVENT_CONNECTION, "connect restored")
 
-                addEventToStation(stId, fEvent)
-            }
-        stationTimers.remove(stId)
+                    addEventToStation(stId, fEvent)
+                }
+            stationTimers.remove(stId)
+        }
     }
 
 }

@@ -4,6 +4,7 @@ import com.yellastrodev.yLogger.AppLogger
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.netty.channel.ChannelOption
 import java.io.FileNotFoundException
 
 fun main(args: Array<String>) {
@@ -13,6 +14,7 @@ fun main(args: Array<String>) {
     val port = 8080
     val server = embeddedServer(Netty, port = port) {
         module()
+        ChannelOption.AUTO_CLOSE
     }
 
     // Логирование информации о сервере

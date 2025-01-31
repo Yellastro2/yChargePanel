@@ -1,5 +1,7 @@
 let previousData = null;
 
+const ONLINE_TIME = 60 * 3
+
 let isFocused = true
 
 document.addEventListener('visibilitychange', function() {
@@ -52,12 +54,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const layout_top = document.getElementById('layout_top');
         const station_title = document.getElementById('station_name');
-        station_title.textContent = `Станция ${data.stId}, онлайн: ${formatTimestamp(data.timestamp * 1000)}`
+        const isOnline = Date.now() - data.timestamp * 1000 <= ONLINE_TIME ? "онлайн" : "офлайн";
+        station_title.textContent = `Станция ${data.stId}, ${isOnline}: ${formatTimestamp(data.timestamp * 1000)}
+        , apk версия - ${data.packageVersion}`
 
         const getLogButton = document.getElementById('stations_log_button');
         getLogButton.onclick = () => getLogs(currentHost, stId);
-        const form = document.getElementById('uploadForm');
-        form.action = `/api/upload/${stId}`;
+        const formImg = document.getElementById('uploadImageForm');
+        formImg.action = `/api/upload/wallpaper/${stId}`;
+
+        const formApk = document.getElementById('uploadApkForm');
+        formApk.action = `/api/upload/apk/${stId}`;
 
         const qrForm = document.getElementById('changeQR');
         qrForm.action = `/api/setQR/${stId}`;

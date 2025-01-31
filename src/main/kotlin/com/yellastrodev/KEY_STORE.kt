@@ -49,6 +49,7 @@ val EVENT_ERROR_OPEN_SERIALPORT = "error_open_serialport"
 val EVENT_NETWORK = "network"
 
 val STATE_KEYS_TRAFFIC = "traffic"
+val PACKAGE_VERSION = "packageVersion"
 
 val ROUT_UPLOADLOGS = "uploadLogs"
 val ROUT_CHECKIN = "checkin"

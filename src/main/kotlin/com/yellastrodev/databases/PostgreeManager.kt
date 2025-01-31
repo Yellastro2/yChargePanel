@@ -1,5 +1,6 @@
 package com.yellastrodev.databases
 
+import com.yellastrodev.databases.Stations.apkVersion
 import com.yellastrodev.databases.Stations.blockedSlots
 import com.yellastrodev.databases.Stations.events
 import com.yellastrodev.databases.Stations.lastDayTraffic
@@ -32,6 +33,7 @@ object Stations : Table() {
     val wallpaper = text("wallpaper").default("") // Новое поле для wallpaper
     val blockedSlots = text("blockedSlots").default("[]")
     val status = enumerationByName("status", 50, Station.Status::class)
+    val apkVersion = text("apkVersion").default("0")
 
     override val primaryKey = PrimaryKey(stId, name = "PK_Stations_stId")
 }
@@ -97,6 +99,7 @@ class PostgreeManager: DbManager {
         updateStatement[wallpaper] = station.wallpaper // Обновляем поле wallpaper
         updateStatement[blockedSlots] = JSONArray(station.blockedSlots.map { it.name }).toString()
         updateStatement[status] = station.status
+        updateStatement[apkVersion] = station.apkVersion
     }
 
     fun deserializeStation(row: ResultRow): Station {
@@ -125,7 +128,8 @@ class PostgreeManager: DbManager {
             blockedSlots = Array(row[size]) { index ->
                 Station.Status.valueOf(jsonArray.optString(index, Station.Status.AVAILABLE.toString())) // Десериализация в массив SlotStatus
             },
-            status = row[status]
+            status = row[status],
+            apkVersion = row[apkVersion]
         )
     }
 

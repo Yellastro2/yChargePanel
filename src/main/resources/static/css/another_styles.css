@@ -66,3 +66,57 @@
     flex-direction: column;
     gap: 10px;
 }
+
+/* Стили только для вашей формы */
+.yForm {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-width: 400px;
+    margin: 20px auto;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+/* Кастомный стиль для input файла */
+.yForm input[type="file"] {
+    display: none; /* Скрываем стандартный input */
+}
+
+.yForm label.custom-file-label {
+    display: inline-block;
+    padding: 12px 25px;
+    background: #2196F3;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+    text-align: center;
+}
+
+.yForm label.custom-file-label:hover {
+    background: #1976D2;
+}
+
+/* Стиль для кнопки отправки */
+.yForm button[type="submit"] {
+    padding: 12px 25px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.yForm button[type="submit"]:hover {
+    background: #45a049;
+}
+
+/* Стиль для отображения имени файла */
+.file-name-display {
+    margin-top: 10px;
+    color: #666;
+    font-size: 0.9em;
+}

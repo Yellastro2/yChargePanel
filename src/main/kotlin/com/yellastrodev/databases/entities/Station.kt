@@ -27,7 +27,8 @@ data class Station(
     var qrString: String = "",
     var wallpaper: String = "",
     var blockedSlots: Array<Status> = Array(size) { Status.AVAILABLE },
-    var status: Status = Status.AVAILABLE
+    var status: Status = Status.AVAILABLE,
+    var apkVersion: String = ""
 )
 {
 

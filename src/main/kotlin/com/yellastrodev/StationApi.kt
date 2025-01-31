@@ -3,15 +3,22 @@ package com.yellastrodev
 import com.yellastrodev.CommandsManager.resetStationTimer
 import com.yellastrodev.CommandsManager.runStationDisconnectTimer
 import com.yellastrodev.CommandsManager.waitForEventOrTimeout
+import com.yellastrodev.CommandsManager.waitMap
 import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.databases.database
 import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.cio.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -57,16 +64,21 @@ fun Application.configureStationRouting() {
         authenticate("auth-apk-static") {
             route("/stationApi") {
                 get("/$ROUT_CHECKIN") {
-//                    val jedis = jedisPool.resource
                     var stId: String? = null
                     try {
+
                         AppLogger.debug(TAG, "Checkin ${call.request.rawQueryParameters}")
                         stId = call.request.queryParameters[KEY_STATION_ID]
+                        if (waitMap.containsKey(stId)) {
+                            AppLogger.debug(TAG, "get/$ROUT_CHECKIN drop phantom $stId")
+                            return@get
+                        }
                         val size = call.request.queryParameters[KEY_SIZE]?.toInt()
                         var state = call.request.queryParameters[KEY_STATE]
                         val timeoutHeader = call.request.headers[KEY_TIMEOUT]?.toIntOrNull()
                         val trafficLastDay = call.request.queryParameters[KEY_TRAFFIC]
                         val events = call.request.queryParameters[KEY_EVENT]
+                        val versionName = call.request.queryParameters[PACKAGE_VERSION]
 
                         AppLogger.info(TAG, "timeout header: $timeoutHeader")
 
@@ -100,13 +112,21 @@ fun Application.configureStationRouting() {
                                     isUpdated = true
                                     fStation.size = it
                                 }
+                            }
 
+                            versionName?.let {
+                                if (fStation.apkVersion != it) {
+                                    isUpdated = true
+                                    fStation.apkVersion = it
+                                }
                             }
 
                             trafficLastDay?.let {
                                 fStation.lastDayTraffic = it
                                 isUpdated = true
                             }
+
+
 
                             events?.let {
                                 // тут чекаем как эвенты меняют стейт станции.
@@ -163,13 +183,9 @@ fun Application.configureStationRouting() {
 
                             var onlineState: JSONObject = JSONObject()
 
-                            state?.let {
-                                if (fStation.state.toString() != it) {
-                                    isUpdated = true
-                                    fStation.state = JSONObject(it)
-                                }
+                            if (timeoutHeader <= 10){
                                 val fWallpaper = if (fStation.wallpaper.isNotEmpty()) fStation.wallpaper
-                                    else DEFAULT_IMAGE
+                                else DEFAULT_IMAGE
 
 //                                if (stateJSON.has(CMD_CHANGE_WALLPAPER))
                                 onlineState = JSONObject(
@@ -177,6 +193,14 @@ fun Application.configureStationRouting() {
                                 )
                                 if (fStation.qrString.isNotEmpty())
                                     onlineState.put(CMD_CHANGE_QR, fStation.qrString)
+                            }
+
+                            state?.let {
+                                if (fStation.state.toString() != it) {
+                                    isUpdated = true
+                                    fStation.state = JSONObject(it)
+                                }
+
                             }
 
                             val exists = false
@@ -190,18 +214,37 @@ fun Application.configureStationRouting() {
                                     return@get
                                 }
 
-                            val newEvent = waitForEventOrTimeout(stId, timeoutHeader)
+                            try {
+//                                call.respondTextWriter(contentType = ContentType.Application.Json) {
+                                withContext(Dispatchers.IO){
 
-                            val response = if (newEvent != null) {
-                                createCommanJson(newEvent)
-                            } else {
-                                JSONObject(mapOf(KEY_COMMAND to "pong", "code" to 200))
+                                    val newEvent = waitForEventOrTimeout(null, stId, timeoutHeader)
+                                    AppLogger.debug(TAG, "waitForEventOrTimeout compleate: $newEvent")
+
+                                    val response = if (newEvent != null) {
+                                        createCommanJson(newEvent)
+                                    } else {
+                                        JSONObject(mapOf("message" to "pong", "code" to 200))
+                                    }
+
+                                    if (onlineState.length() > 0) {
+                                        onlineState.remove(response.optString(KEY_COMMAND))
+                                        response.put(KEY_ONLINE_STATE, onlineState)
+                                    }
+
+                                    AppLogger.info(TAG,"send responce to $stId: $response")
+
+
+//                                    write(response.toString())
+
+                                    call.respond(HttpStatusCode.OK, response.toString())
+
+                                }
+                            } catch (e: ChannelWriteException) {
+                                AppLogger.error(TAG, "delayed-response ChannelWriteException")
                             }
 
-                            if (onlineState.length() > 0) {
-                                onlineState.remove(response.optString(KEY_COMMAND))
-                                response.put(KEY_ONLINE_STATE, onlineState)
-                            }
+
 
 
                             var resp = "Station added: ${stId}"
@@ -209,10 +252,7 @@ fun Application.configureStationRouting() {
                                 resp = "Station updated: ${stId}"
                             }
 
-                            AppLogger.info(TAG,"send responce to $stId: $response")
 
-
-                            call.respond(HttpStatusCode.OK, response.toString())
 
                         } else {
                             AppLogger.warn(TAG,"Missing or invalid query parameters")
@@ -224,6 +264,14 @@ fun Application.configureStationRouting() {
                     } finally {
                         stId?.let { runStationDisconnectTimer(stId) }
                     }
+                }
+
+                get("/delayed-response") {
+//
+//                    // Ваш код задержки
+                    delay(30000) // 30 секунд
+                    call.respond(HttpStatusCode.OK, "Ответ после паузы 30 секунд")
+
                 }
             }
         }

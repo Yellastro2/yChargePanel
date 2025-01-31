@@ -254,6 +254,7 @@ fun Application.configureWebApiRouting() {
                         val blockedSlotsState = fStation.blockedSlots.map { if (it == Station.Status.BLOCKED) 1 else 0 }
 
                         put("blockedSlots", JSONArray(blockedSlotsState))
+                        put(PACKAGE_VERSION, fStation.apkVersion)
 
 
                     }
