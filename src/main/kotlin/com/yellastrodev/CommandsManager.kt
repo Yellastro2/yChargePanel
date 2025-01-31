@@ -26,7 +26,6 @@ object CommandsManager {
     val DISCONNECT_TIMEOUT = 10 * 1000L
 
     val waitMap: ConcurrentHashMap<String, CompletableFuture<JSONObject?>> = ConcurrentHashMap()
-    val checkMap: ConcurrentHashMap<String, Job> = ConcurrentHashMap()
 
     fun setWallpaper(stId: String, newFileName: String) {
         // поменять значение обоев в базе данных + отправить команду станции о смене обоев.
@@ -53,53 +52,19 @@ object CommandsManager {
     }
 
     fun cleanLongPool(stId: String) {
-        checkMap[stId]?.cancel()
         waitMap.remove(stId)
-        checkMap.remove(stId)
     }
 
-    suspend fun waitForEventOrTimeout(writer: Writer?, stId: String, timeout: Int): JSONObject? {
+    suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JSONObject? {
         // проверяем в очереди команд наличие ожидающих - если есть, отправляем самую старую, из очереди удаляем.
         if (commandPoolMap.containsKey(stId) && commandPoolMap[stId]!!.size > 0)
             return commandPoolMap[stId]!!.removeAt(0)
-        checkMap[stId]?.cancel()
         // создаем пустую фьючу с ожиданием как на таймауте лонгпула, помещаем ее в мапу по ключу айди станции
         // потом можно эту фьючу найти в этой мапе и завершить командой. или она выкинет таймаут по истечении.
         val future = waitMap.computeIfAbsent(stId) { CompletableFuture<JSONObject?>() }
         return try {
-            val fTimeout = (if (timeout > 10) timeout - 5 else 0)
-            AppLogger.debug(TAG, "waitForEventOrTimeout start fTimeout: $fTimeout")
-            // если таймаут стоит меньше 10 секунд, значит это запрос на первое подключение и нужно сразу же ответить что серв на связи
-            withTimeoutOrNull( fTimeout * 1000L) {
-
-                // Создаём корутину для периодической проверки
-                checkMap[stId] = launch(Dispatchers.IO) {
-                    while (isActive) {
-                        delay(1000) // Периодическая проверка (каждые 1 секунду)
-                        // Здесь добавляем свою проверку
-                        try {
-                            AppLogger.debug(TAG, "waitForEventOrTimeout checkJob write")
-                            writer?.write("_")
-                        } catch (e: Exception) {
-                            AppLogger.error(TAG, "Error checkJob: ${e.message}", e)
-                        }
-//                            if (someCondition()) {
-//                                // Если условие выполнено, можно завершить с успехом или выполнить другие действия
-//                                future.complete(JSONObject().apply { put("status", "checked") })
-//                                break // Прерываем цикл, так как условие выполнено
-//                            }
-                    }
-                }
-
-                // Ожидаем завершения future (с ожидаемым результатом или истечением таймаута)
-                val result = future.await()
-                checkMap[stId]?.cancel()
-                AppLogger.debug(TAG, "waitForEventOrTimeout future comlete")
-
-
-
-                 // После завершения future останавливаем проверку
-                return@withTimeoutOrNull result
+            withTimeoutOrNull((if (timeout > 10) timeout - 5 else 0).toLong() * 1000) {
+                future.await()
             }
         } catch (e: TimeoutCancellationException) {
             AppLogger.info(TAG, "TimeoutCancellationException ")
@@ -112,7 +77,6 @@ object CommandsManager {
             return null
         }
         finally {
-            checkMap[stId]?.cancel()
             waitMap.remove(stId)
         }
     }

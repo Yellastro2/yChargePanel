@@ -214,44 +214,22 @@ fun Application.configureStationRouting() {
                                     return@get
                                 }
 
-                            try {
-//                                call.respondTextWriter(contentType = ContentType.Application.Json) {
-                                withContext(Dispatchers.IO){
-
-                                    val newEvent = waitForEventOrTimeout(null, stId, timeoutHeader)
-                                    AppLogger.debug(TAG, "waitForEventOrTimeout compleate: $newEvent")
-
-                                    val response = if (newEvent != null) {
-                                        createCommanJson(newEvent)
-                                    } else {
-                                        JSONObject(mapOf("message" to "pong", "code" to 200))
-                                    }
-
-                                    if (onlineState.length() > 0) {
-                                        onlineState.remove(response.optString(KEY_COMMAND))
-                                        response.put(KEY_ONLINE_STATE, onlineState)
-                                    }
-
-                                    AppLogger.info(TAG,"send responce to $stId: $response")
+                            val newEvent = waitForEventOrTimeout(stId, timeoutHeader)
 
 
-//                                    write(response.toString())
-
-                                    call.respond(HttpStatusCode.OK, response.toString())
-
-                                }
-                            } catch (e: ChannelWriteException) {
-                                AppLogger.error(TAG, "delayed-response ChannelWriteException")
+                            val response = if (newEvent != null) {
+                                createCommanJson(newEvent)
+                            } else {
+                                JSONObject(mapOf(KEY_COMMAND to "pong", "code" to 200))
                             }
 
-
-
-
-                            var resp = "Station added: ${stId}"
-                            if (exists) {
-                                resp = "Station updated: ${stId}"
+                            if (onlineState.length() > 0) {
+                                onlineState.remove(response.optString(KEY_COMMAND))
+                                response.put(KEY_ONLINE_STATE, onlineState)
                             }
 
+                            AppLogger.info(TAG,"send responce to $stId: $response")
+                            call.respond(HttpStatusCode.OK, response.toString())
 
 
                         } else {
