@@ -1,5 +1,6 @@
 package com.yellastrodev
 
+import com.yellastrodev.CommandsManager.cleanLongPool
 import com.yellastrodev.CommandsManager.resetStationTimer
 import com.yellastrodev.CommandsManager.runStationDisconnectTimer
 import com.yellastrodev.CommandsManager.waitForEventOrTimeout
@@ -71,7 +72,7 @@ fun Application.configureStationRouting() {
                         stId = call.request.queryParameters[KEY_STATION_ID]
                         if (waitMap.containsKey(stId)) {
                             AppLogger.debug(TAG, "get/$ROUT_CHECKIN drop phantom $stId")
-                            return@get
+                            cleanLongPool(stId)
                         }
                         val size = call.request.queryParameters[KEY_SIZE]?.toInt()
                         var state = call.request.queryParameters[KEY_STATE]

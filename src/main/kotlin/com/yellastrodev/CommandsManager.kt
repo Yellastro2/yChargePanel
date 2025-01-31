@@ -51,7 +51,7 @@ object CommandsManager {
         }
     }
 
-    fun cleanLongPool(stId: String) {
+    fun cleanLongPool(stId: String?) {
         waitMap.remove(stId)
     }
 
