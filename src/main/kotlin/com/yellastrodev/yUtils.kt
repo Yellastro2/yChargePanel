@@ -1,5 +1,6 @@
 package com.yellastrodev
 
+import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.ymtserial.logFileDateFormat
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -120,4 +121,38 @@ fun findLatestLogFile(dir: File): File? {
         }
     }
     return latestFile
+}
+
+fun getSerialNumbersForStation(station: Station): List<String> {
+    val serialNumbers = mutableListOf<String>()
+
+    // Проходим по всем слотам станции
+    station.state.keys().forEach { slotId ->
+        // Извлекаем данные по банку
+        val slotData = station.state.getJSONObject(slotId)
+        val bankId = slotData.optString("bankId") // Серийный номер пауэрбанка (bankId)
+        if (bankId.isNotEmpty()) {
+            serialNumbers.add(bankId)
+        }
+    }
+
+    return serialNumbers
+}
+
+fun getChargedPowerbanksCount(station: Station): Int {
+    var chargedCount = 0
+
+    // Проходим по всем слотам станции
+    station.state.keys().forEach { slotId ->
+        // Извлекаем данные по банку
+        val slotData = station.state.getJSONObject(slotId)
+        val charge = slotData.optInt("charge", -1) // Заряд пауэрбанка в процентах
+
+        // Проверяем, если заряд больше 90%
+        if (charge >= 90) {
+            chargedCount++
+        }
+    }
+
+    return chargedCount
 }

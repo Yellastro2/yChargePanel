@@ -162,10 +162,13 @@ fun Application.configureWebApiRouting() {
 
             get("/$ROUT_STATIONLIST") {
                 try {
+                    AppLogger.info(TAG, "/$ROUT_STATIONLIST : ${call.request.queryParameters}")
                     // Получаем параметры `page` и `pageSize` из запроса
                     val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
                     val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 20
                     val filter = call.request.queryParameters["filter"]?: "" // Онлайн или офлайн фильтр
+                    val isFull = call.request.queryParameters["isFull"]?.toBoolean() ?: false // Новый параметр
+
 
                     // Рассчитываем offset
                     val offset = (page - 1) * pageSize
@@ -184,7 +187,7 @@ fun Application.configureWebApiRouting() {
                     val responseJson = JSONObject().apply {
                         put("stations", JSONArray().apply {
                             fStations.forEach { station ->
-                                put(JSONObject().apply {
+                                val stationJson = JSONObject().apply {
                                     put(KEY_STATION_ID, station.stId)
                                     put(KEY_SIZE, station.size)
                                     put(KEY_AVAIBLE, station.state.length()) // Количество полей в state
@@ -193,8 +196,20 @@ fun Application.configureWebApiRouting() {
                                     put("wallpaper", if (station.wallpaper.isBlank()) DEFAULT_IMAGE else station.wallpaper)
                                     put("QRCode", station.qrString)
                                     put(KEY_STATUS, station.status)
+                                }
 
-                                })
+                                // Если isFull=true, добавляем дополнительную информацию
+                                if (isFull) {
+                                    // Добавляем серийные номера (пример)
+                                    val serialNumbers = getSerialNumbersForStation(station) // Метод, который вернет серийные номера
+                                    stationJson.put("serialNumbers", serialNumbers)
+
+                                    // Добавляем количество заряженных пауэрбанков до 90% (пример)
+                                    val chargedPowerbanks = getChargedPowerbanksCount(station) // Метод, который вернет количество таких пауэрбанков
+                                    stationJson.put("chargedPowerbanks", chargedPowerbanks)
+                                }
+
+                                put(stationJson) // Добавляем объект станции в массив
                             }
                         })
                         put("total", totalStations.first)

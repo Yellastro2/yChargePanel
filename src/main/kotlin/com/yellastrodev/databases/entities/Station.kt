@@ -10,7 +10,27 @@ import org.json.JSONObject
  * @property stId Уникальный идентификатор станции.
  * @property size Количество слотов на станции (по умолчанию 0).
  * @property lastDayTraffic Строка с информацией о трафике за последний день.
- * @property state Состояние станции, представленное в виде объекта JSON.
+ * @property state Состояние станции, представленное в виде объекта JSON. Пример:
+ * { // индекс начинается с 1 так как порт станции возвращает их номера также
+ *     "1": {
+ *         "date": 1738412825755,
+ *         "some": "0",
+ *         "bankId": "F2000C35E1",
+ *         "charge": "70",
+ *         "slotId": "1",
+ *         "type": "add_bank",
+ *         "motor_state": "0"
+ *     },
+ *     "4": {
+ *         "date": 1738354729308,
+ *         "some": "0",
+ *         "bankId": "F2000C35E7",
+ *         "charge": "100",
+ *         "slotId": "12",
+ *         "type": "add_bank",
+ *         "motor_state": "0"
+ *     }
+ * }
  * @property events Список событий, связанных со станцией.
  * @property timestamp Метка времени в секундах.
  * @property qrString Строка QR-кода для станции.
