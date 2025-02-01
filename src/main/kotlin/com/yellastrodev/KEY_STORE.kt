@@ -20,6 +20,7 @@ val KEY_PATH = "path"
 val KEY_TEXT = "text"
 val KEY_AVAIBLE = "available"
 val KEY_BANK_ID = "bankId"
+val KEY_STATUS = "status"
 
 val EVENT_TYPE = "type"
 
@@ -68,6 +69,7 @@ val ROUT_BLOCK_SLOT = "block_slot"
 val ROUT_STATION = "/station"
 val ROUT_UPDATE_BANK_STATUS = "updateBankStatus"
 val ROUT_REBOOT = "reboot"
+val ROUT_DISABLE_STATION = "disableStation"
 
 val PATH_BASE = "uploads"
 val PATH_WALLPAPERS = "${PATH_BASE}/wallpapers"
@@ -80,6 +82,8 @@ val CMD_CHANGE_WALLPAPER = "wallpaper"
 val CMD_CHANGE_QR = "QR_data"
 val CMD_REBOOT = "reboot"
 val CMD_UPDATE_APK = "update_apk"
+
+val CMD_CANCEL = "cancel" // внутренняя команда сервера о перезапуске соединения клиентом
 
 
 val logFileDateFormat = SimpleDateFormat("yyyy.MM.dd_HH-mm-ss", Locale.getDefault())

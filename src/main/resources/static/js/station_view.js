@@ -70,7 +70,10 @@ document.addEventListener('DOMContentLoaded', function() {
         qrForm.action = `/api/setQR/${stId}`;
 
         document.getElementById('btn_reboot').onclick = () => rebootStation(currentHost, stId);
-        document.getElementById('btn_disable').onclick = () => disableStation(currentHost, stId);
+        const btnDisableStation = document.getElementById('btn_disable')
+        btnDisableStation.onclick = () => disableStation(currentHost, stId);
+        btnDisableStation.textContent = data.status == "AVAILABLE" ? 'Доступен' : 'Заблочен';
+        btnDisableStation.className = data.status == "AVAILABLE" ? 'btn btn-success' : 'btn btn-danger';
 
         const blockedSlots = data.blockedSlots
 
@@ -221,7 +224,7 @@ function baseRequest(apiUrl) {
         console.log(data)
         //            alert(`Слот ${num} открыт: ${data.status}`);
     })
-        .catch(error => console.error('Error ${apiUrl}:', error));
+        .catch(error => console.error(`Error ${apiUrl}:`, error));
 }
 
 function forceSlot(currentHost, stId, num) {

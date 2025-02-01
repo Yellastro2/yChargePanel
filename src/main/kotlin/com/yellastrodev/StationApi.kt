@@ -71,7 +71,7 @@ fun Application.configureStationRouting() {
                         AppLogger.debug(TAG, "Checkin ${call.request.rawQueryParameters}")
                         stId = call.request.queryParameters[KEY_STATION_ID]
                         if (waitMap.containsKey(stId)) {
-                            AppLogger.debug(TAG, "get/$ROUT_CHECKIN drop phantom $stId")
+                            AppLogger.debug(TAG, "get/$ROUT_CHECKIN drop existing $stId future")
                             cleanLongPool(stId)
                         }
                         val size = call.request.queryParameters[KEY_SIZE]?.toInt()
@@ -219,6 +219,8 @@ fun Application.configureStationRouting() {
 
 
                             val response = if (newEvent != null) {
+                                if (newEvent.optString(KEY_COMMAND) == CMD_CANCEL)
+                                    return@get
                                 createCommanJson(newEvent)
                             } else {
                                 JSONObject(mapOf(KEY_COMMAND to "pong", "code" to 200))

@@ -192,7 +192,6 @@ fun Application.configureWebApiRouting() {
                                     put(KEY_TRAFFIC_LAST_DAY, station.lastDayTraffic)
                                     put("wallpaper", if (station.wallpaper.isBlank()) DEFAULT_IMAGE else station.wallpaper)
                                     put("QRCode", station.qrString)
-                                    put(KEY_STATUS, station.status)
 
                                 })
                             }

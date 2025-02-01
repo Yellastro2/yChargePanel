@@ -68,6 +68,10 @@ function loadStations(page, filter = '') {
             stIdCell.textContent = station.stId;
             row.appendChild(stIdCell);
 
+            const stStatusCell = document.createElement('td');
+            stStatusCell.textContent = station.status;
+            row.appendChild(stStatusCell);
+
             const sizeCell = document.createElement('td');
             sizeCell.textContent = station.size;
             row.appendChild(sizeCell);
@@ -114,7 +118,7 @@ function loadStations(page, filter = '') {
             // Добавление изображения
             if (station.wallpaper) {
                 const img = document.createElement('img');
-                img.src = `/api/download?path=wallpapers/${station.wallpaper}`;
+                img.src = `/api/download?path=uploads/wallpapers/${station.wallpaper}`;
                 img.alt = 'Wallpaper';
                 img.style.width = '50px'; // Пример размера
                 img.style.height = '50px'; // Пример размера

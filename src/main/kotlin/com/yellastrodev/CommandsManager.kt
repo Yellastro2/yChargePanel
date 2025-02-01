@@ -2,10 +2,7 @@ package com.yellastrodev
 
 import com.yellastrodev.databases.database
 import com.yellastrodev.yLogger.AppLogger
-import com.yellastrodev.ymtserial.CMD_CHANGE_WALLPAPER
-import com.yellastrodev.ymtserial.CMD_UPDATE_APK
-import com.yellastrodev.ymtserial.EVENT_CONNECTION
-import com.yellastrodev.ymtserial.EVENT_TYPE
+import com.yellastrodev.ymtserial.*
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -52,7 +49,9 @@ object CommandsManager {
     }
 
     fun cleanLongPool(stId: String?) {
-        waitMap.remove(stId)
+        waitMap.remove(stId)?.complete(JSONObject(mapOf(
+            KEY_COMMAND to CMD_CANCEL
+        )))
     }
 
     suspend fun waitForEventOrTimeout(stId: String, timeout: Int): JSONObject? {
