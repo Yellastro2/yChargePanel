@@ -1,0 +1,311 @@
+openapi: 3.0.0
+info:
+  title: API для работы с батарейными станциями
+  version: 1.0.0
+paths:
+  /api/{fileType}/{stId}:
+    post:
+      summary: Загрузка файлов для станции
+      parameters:
+        - name: fileType
+          in: path
+          required: true
+          description: Тип файла (например, wallpaper или APK)
+          schema:
+            type: string
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        302:
+          description: Перенаправление на страницу станции
+
+  /api/{stId}/set-qr:
+    post:
+      summary: Установка QR-кода для станции
+      parameters:
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+        - name: text
+          in: query
+          required: true
+          description: Текст для QR-кода
+          schema:
+            type: string
+      responses:
+        302:
+          description: Перенаправление на страницу станции
+
+  /api/{stId}/logs:
+    get:
+      summary: Получение логов для станции
+      parameters:
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+      responses:
+        200:
+          description: Успешный ответ с логами в виде файла
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /api/stations:
+    get:
+      summary: Получение списка станций
+      parameters:
+        - name: page
+          in: query
+          description: Номер страницы
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          description: Количество станций на странице
+          schema:
+            type: integer
+            default: 20
+        - name: filter
+          in: query
+          description: Фильтрация по состоянию станции (онлайн/оффлайн)
+          schema:
+            type: string
+        - name: isFull
+          in: query
+          description: Дополнительная информация о станции - список айди банков и количество заряженых >90%
+          schema:
+            type: boolean
+            default: false
+      responses:
+        200:
+          description: Успешный ответ с данными станций
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    example: 64
+                  filtered:
+                    type: integer
+                    example: 64
+                  online:
+                    type: integer
+                    example: 1
+                  stations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        stId:
+                          type: string
+                          example: "F0F5BD734868"
+                        size:
+                          type: integer
+                          example: 12
+                        available:
+                          type: integer
+                          example: 5
+                        timestamp:
+                          type: integer
+                          example: 1738419742
+                        trafficLastDay:
+                          type: string
+                          example: "{}"
+                        wallpaper:
+                          type: string
+                          example: "32.jpg"
+                        qrCode:
+                          type: string
+                          example: "Liza sexy"
+                        status:
+                          type: string
+                          example: "AVAILABLE"
+                        serialNumbers:
+                          type: array
+                          items:
+                            type: string
+                            example:
+                              - "F2000C35E1"
+                              - "F2000C35E7"
+                              - "F2000C3615"
+                              - "F2000C360C"
+                              - "F2000C35FE"
+                        chargedPowerbanks:
+                          type: integer
+                          example: 2
+  
+  /api/{stId}/info:
+    get:
+      summary: Получение информации о станции
+      parameters:
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+      responses:
+        200:
+          description: Успешный ответ с полной информацией о станции
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stId:
+                    type: string
+                  size:
+                    type: integer
+                  state:
+                    type: object
+                  timestamp:
+                    type: integer
+                  trafficLastDay:
+                    type: integer
+                  events:
+                    type: array
+                    items:
+                      type: string
+                  blockedSlots:
+                    type: array
+                    items:
+                      type: integer
+                  apkVersion:
+                    type: string
+                  status:
+                    type: string
+
+  /api/{stId}/release:
+    get:
+      summary: Разблокировка слота станции
+      parameters:
+        - name: stId
+          in: query
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+        - name: num
+          in: query
+          required: true
+          description: Номер слота для разблокировки
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Успешное выполнение команды
+
+  /api/{stId}/force:
+    get:
+      summary: Принудительная разблокировка слота станции
+      parameters:
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+        - name: num
+          in: query
+          required: true
+          description: Номер слота для принудительной разблокировки
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Успешное выполнение команды
+
+  /api/{stId}/reboot:
+    get:
+      summary: Перезагрузка станции
+      parameters:
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+      responses:
+        200:
+          description: Успешное выполнение команды
+
+  /api/{stId}/block-slot:
+    get:
+      summary: Блокировка слота станции
+      parameters:
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+        - name: num
+          in: query
+          required: true
+          description: Номер слота для блокировки
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Успешное выполнение команды
+
+  /api/{stId}/disable:
+    get:
+      summary: Отключение/включение станции
+      parameters:
+        - name: stId
+          in: path
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+      responses:
+        200:
+          description: Успешное выполнение команды
+
+  /api/{stId}/uploadlogs:
+    post:
+      summary: Загрузка архивов логов для станции
+      parameters:
+        - name: stId
+          in: query
+          required: true
+          description: Идентификатор станции
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: Успешный ответ о загрузке

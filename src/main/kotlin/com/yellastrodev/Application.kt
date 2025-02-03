@@ -1,9 +1,11 @@
 package com.yellastrodev
 
 import com.yellastrodev.yLogger.AppLogger
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.cors.routing.*
 import io.netty.channel.ChannelOption
 import java.io.FileNotFoundException
 
@@ -13,6 +15,10 @@ fun main(args: Array<String>) {
 
     val port = 8080
     val server = embeddedServer(Netty, port = port) {
+        install(CORS) {
+            anyHost()
+            allowHeader(HttpHeaders.ContentType)
+        }
         module()
         ChannelOption.AUTO_CLOSE
     }
@@ -31,6 +37,7 @@ fun readHtml(filename: String): String {
 }
 
 fun Application.module() {
+
     configureSecurity()
     configureWebApiRouting()
     configureWebRouting()

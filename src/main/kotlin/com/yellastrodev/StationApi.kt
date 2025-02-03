@@ -29,9 +29,11 @@ val MAX_EVENTS_SIZE = 100
  * Добавляем эвент в станцию, связанный с бэкендом - онлай\офлайн итп.
  * не использовать для эвентов связанных с слотами\банками
  */
-fun addEventToStation(stId: String, eventJson: JSONObject) {
+suspend fun addEventToStation(stId: String, eventJson: JSONObject) {
     val station = database.getStationById(stId) ?: return  // Если станция не найдена, возвращаем false
     var isUpdated = false
+
+    BusinessClient.sendEventsToBusiness(stId, listOf(eventJson))
 
     // Добавляем эвент в список станции
     station.events.add(eventJson)
@@ -144,7 +146,7 @@ fun Application.configureStationRouting() {
                                     fStation.state
                                 }
 
-                                // сохраняем строковый отпечаток стейта для дальше сравнения
+                                // сохраняем строковый отпечаток стейта для дальнейшего сравнения
                                 val stateStringPrevius = stateJSON.toString()
 
                                 // каждый эвент: 1. сохраняем в список всех последних эвентов
@@ -156,6 +158,7 @@ fun Application.configureStationRouting() {
                                     if (qEvent.has(EVENT_SLOT_ID)) {
                                         val qSlot = qEvent.getString(EVENT_SLOT_ID)
                                         val qEventType = qEvent.getString(EVENT_TYPE)
+
                                         if (stateJSON.has(qSlot)) {
                                             if (qEventType == EVENT_REMOVE_BANK)
                                                 stateJSON.remove(qSlot)
@@ -174,14 +177,19 @@ fun Application.configureStationRouting() {
 
 //                                value[KEY_EVENT] = JSONArray(fPreviusEvents).toString()
 
-                                if (stateStringPrevius != stateJSON.toString()) {
-                                    state = stateJSON.toString()
-                                    AppLogger.info(TAG,"NEW EVENT RECEIVED")
+                                // если стейт слотов в базе не совпадает с новым, то обновляем
+                                if (fStation.state.toString() != stateJSON.toString()) {
+                                    fStation.state = stateJSON
+                                    AppLogger.info(TAG,"найдены эвенты обновления стейта слотов!")
                                     isUpdated = true
                                 }
-                                //TODO
+
+                                BusinessClient.sendEventsToBusiness(stId, fEventsSort)
                             }
 
+                            // доп. состояния будут отправлены на станцию если она налаживает соединение после офлайна,
+                            // то есть когда timeoutHeader = 10. это состояния актуальных обоев и кюара, вдруг команды
+                            // их смены не дошли таки до станции.
                             var onlineState: JSONObject = JSONObject()
 
                             if (timeoutHeader <= 10){
@@ -196,13 +204,7 @@ fun Application.configureStationRouting() {
                                     onlineState.put(CMD_CHANGE_QR, fStation.qrString)
                             }
 
-                            state?.let {
-                                if (fStation.state.toString() != it) {
-                                    isUpdated = true
-                                    fStation.state = JSONObject(it)
-                                }
 
-                            }
 
                             val exists = false
                             if (isUpdated)
@@ -215,6 +217,7 @@ fun Application.configureStationRouting() {
                                     return@get
                                 }
 
+                            // там запускается фьюча с таймаутом - 5 которая ждет команды для станции либо возрвращает null по таймауту
                             val newEvent = waitForEventOrTimeout(stId, timeoutHeader)
 
 

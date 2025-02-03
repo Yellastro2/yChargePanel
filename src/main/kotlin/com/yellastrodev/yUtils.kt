@@ -5,6 +5,7 @@ import com.yellastrodev.ymtserial.logFileDateFormat
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
+import org.json.JSONObject
 import java.io.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -45,7 +46,11 @@ suspend fun extractParametersOrFail(
     }
 
     if (missingKeys.isNotEmpty()) {
-        onError("Missing parameters: ${missingKeys.joinToString(", ")}")
+        val errorJson = JSONObject().apply {
+            put("error", "Missing parameters")
+            put("missing", missingKeys)
+        }
+        onError(errorJson.toString())
         return null
     }
 
