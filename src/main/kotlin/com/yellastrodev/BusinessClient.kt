@@ -1,5 +1,6 @@
 package com.yellastrodev
 
+import com.yellastrodev.ymtserial.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,8 +29,19 @@ object BusinessClient {
     }
 
     suspend fun sendEventsToBusiness(stId: String, fEventsSort: List<JSONObject>) {
+        val fFiltredList = fEventsSort.filter { qEvent ->
+            val qType = qEvent.getString(EVENT_TYPE)
+            when (qType) {
+                EVENT_ADD_BANK -> true
+                EVENT_REMOVE_BANK -> true
+                EVENT_CHARGE -> {
+                    qEvent.optInt(EVENT_CHARGE_NEW) >= 90 && qEvent.optInt(EVENT_CHARGE_OLD) <= 90
+                }
+                else -> false
+            }
+        }
         mutex.withLock {
-            fEventsSort.forEach { event ->
+            fFiltredList.forEach { event ->
                 event.put("stationId", stId)
                 eventQueue.add(event)
             }
