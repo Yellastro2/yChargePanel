@@ -29,23 +29,23 @@ object BusinessClient {
     }
 
     suspend fun sendEventsToBusiness(stId: String, fEventsSort: List<JSONObject>) {
-        val fFiltredList = fEventsSort.filter { qEvent ->
-            val qType = qEvent.getString(EVENT_TYPE)
-            when (qType) {
-                EVENT_ADD_BANK -> true
-                EVENT_REMOVE_BANK -> true
-                EVENT_CHARGE -> {
-                    qEvent.optInt(EVENT_CHARGE_NEW) >= 90 && qEvent.optInt(EVENT_CHARGE_OLD) <= 90
-                }
-                else -> false
-            }
-        }
-        mutex.withLock {
-            fFiltredList.forEach { event ->
-                event.put("stationId", stId)
-                eventQueue.add(event)
-            }
-        }
+//        val fFiltredList = fEventsSort.filter { qEvent ->
+//            val qType = qEvent.getString(EVENT_TYPE)
+//            when (qType) {
+//                EVENT_ADD_BANK -> true
+//                EVENT_REMOVE_BANK -> true
+//                EVENT_CHARGE -> {
+//                    qEvent.optInt(EVENT_CHARGE_NEW) >= 90 && qEvent.optInt(EVENT_CHARGE_OLD) <= 90
+//                }
+//                else -> false
+//            }
+//        }
+//        mutex.withLock {
+//            fFiltredList.forEach { event ->
+//                event.put("stationId", stId)
+//                eventQueue.add(event)
+//            }
+//        }
     }
 
     private suspend fun sendQueuedEvents() {

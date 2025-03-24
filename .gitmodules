@@ -1,0 +1,3 @@
+[submodule "libs/ylogger"]
+	path = libs/ylogger
+	url = https://github.com/Yellastro2/ylogger_kt

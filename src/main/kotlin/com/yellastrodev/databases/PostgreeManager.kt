@@ -13,7 +13,7 @@ import com.yellastrodev.databases.Stations.timestamp
 import com.yellastrodev.databases.Stations.wallpaper
 import com.yellastrodev.databases.entities.Powerbank
 import com.yellastrodev.databases.entities.Station
-import com.yellastrodev.yLogger.AppLogger
+import com.yellastrodev.ymtserial.ylogger.AppLogger
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.*
@@ -109,7 +109,7 @@ class PostgreeManager: DbManager {
             try {
                 stringToArray(row[Stations.events])
             } catch (e: Exception) {
-                AppLogger.error(TAG, "Error parsing events: ${e.message}")
+                AppLogger.error("Error parsing events: ${e.message}")
                 ArrayList<JSONObject>()
             }
         }

@@ -1,0 +1,8 @@
+openapi: 3.0.3
+info:
+  title: Total API
+  description: |
+    Доступны следующие документы по API:
+    - [API Модуль веб панели](/webApi/swagger)
+    - [API Модуль связи со станций](/stationApi/swagger)
+  version: 1.0.0

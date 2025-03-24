@@ -1,8 +1,8 @@
 package com.yellastrodev
 
 import com.yellastrodev.databases.database
-import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
+import com.yellastrodev.ymtserial.ylogger.AppLogger
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -36,7 +36,7 @@ object CommandsManager {
                 sendCommandToStation(stId,JSONObject(mapOf(CMD_CHANGE_WALLPAPER to newFileName)))
             }
         } catch (e: Exception) {
-            AppLogger.error(TAG, "Error setWallpaper: ${e.message}", e)
+            AppLogger.error("Error setWallpaper: ${e.message}", e)
         }
     }
 
@@ -44,7 +44,7 @@ object CommandsManager {
         try {
             sendCommandToStation(stId,JSONObject(mapOf(CMD_UPDATE_APK to newFileName)))
         } catch (e: Exception) {
-            AppLogger.error(TAG, "Error updateAPK: ${e.message}", e)
+            AppLogger.error("Error updateAPK: ${e.message}", e)
         }
     }
 
@@ -66,13 +66,13 @@ object CommandsManager {
                 future.await()
             }
         } catch (e: TimeoutCancellationException) {
-            AppLogger.info(TAG, "TimeoutCancellationException ")
+            AppLogger.info("TimeoutCancellationException ")
             null
         } catch (e: TimeoutException) {
-            AppLogger.info(TAG, "TimeoutException ")
+            AppLogger.info("TimeoutException ")
             null
         } catch (e: CancellationException){
-            AppLogger.info(TAG, "CancellationException cuz longpool timeout future cancelled")
+            AppLogger.info("CancellationException cuz longpool timeout future cancelled")
             return null
         }
         finally {
@@ -106,15 +106,15 @@ object CommandsManager {
         // Получаем блокировку, чтобы предотвратить параллельный доступ
 //        runBlocking {
             mutex.withLock {
-                AppLogger.debug(TAG, "runStationDisconnectTimer stationTimers[$stId]?.cancel() ")
+                AppLogger.debug("runStationDisconnectTimer stationTimers[$stId]?.cancel() ")
                 stationTimers[stId]?.cancel()
-                AppLogger.debug(TAG, "runStationDisconnectTimer run disconect timer ")
+                AppLogger.debug("runStationDisconnectTimer run disconect timer ")
                 stationTimers[stId] = CoroutineScope(Dispatchers.IO).launch {
-                    AppLogger.debug(TAG, "runStationDisconnectTimer launch ")
+                    AppLogger.debug("runStationDisconnectTimer launch ")
                     delay(DISCONNECT_TIMEOUT) // Ожидание 5 секунд
                     stationTimers.remove(stId)
-                    AppLogger.warn(TAG, "Станция $stId ожидание прошло: ${this.isActive}")
-                    AppLogger.warn(TAG, "Станция $stId потеряла соединение!")
+                    AppLogger.warn("Станция $stId ожидание прошло: ${this.isActive}")
+                    AppLogger.warn("Станция $stId потеряла соединение!")
                     val fEvent = JSONObject()
 
                     fEvent.put("date", System.currentTimeMillis())
@@ -129,15 +129,15 @@ object CommandsManager {
     }
 
     suspend fun resetStationTimer(stId: String) {
-        AppLogger.debug(TAG, "resetStationTimer stationTimers[$stId]?.cancel() \n" +
+        AppLogger.debug("resetStationTimer stationTimers[$stId]?.cancel() \n" +
                 "${stationTimers.containsKey(stId)}")
         cleanLongPool(stId)
         mutex.withLock {
-            AppLogger.debug(TAG, "resetStationTimer withLock")
+            AppLogger.debug("resetStationTimer withLock")
 
             stationTimers[stId]?.cancel() // Отменяем старый таймер, если есть
                 ?: run {
-                    AppLogger.warn(TAG, "Станция $stId восстановила соединение!")
+                    AppLogger.warn("Станция $stId восстановила соединение!")
                     val fEvent = JSONObject()
 
                     fEvent.put("date", System.currentTimeMillis())

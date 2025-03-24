@@ -7,8 +7,8 @@ import com.yellastrodev.CommandsManager.updateAPK
 import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.databases.database
 import com.yellastrodev.databases.entities.Powerbank
-import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
+import com.yellastrodev.ymtserial.ylogger.AppLogger
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
@@ -28,11 +28,13 @@ import org.json.JSONObject
 import java.io.*
 import java.util.concurrent.CompletableFuture
 
+// Карта для хранения колбеков
+val uploadLogsCallbacks = mutableMapOf<String, CompletableFuture<Unit>>()
+
 
 fun Application.configureWebApiRouting() {
 
-    // Карта для хранения колбеков
-    val uploadLogsCallbacks = mutableMapOf<String, CompletableFuture<Unit>>()
+
 
     val TAG = "WebApiRouting"
 
@@ -44,8 +46,16 @@ fun Application.configureWebApiRouting() {
     }
 
     routing {
-        swaggerUI(path = "swagger", swaggerFile = "openapi/documentation.yaml")
-        route("/api") {
+
+        route("/") {
+            swaggerUI(path = "swagger", swaggerFile = "openapi/base.yaml")
+        }
+
+        route("/webApi") {
+            swaggerUI(path = "swagger", swaggerFile = "openapi/webApi.yaml")
+            }
+
+        route("/webApi") {
 
             post("/$ROUT_UPLOAD_FILE_FORSTATION/{fileType}/{$KEY_STATION_ID}") {
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, "fileType")) { errorMessage ->
@@ -94,8 +104,6 @@ fun Application.configureWebApiRouting() {
                 call.respondRedirect("/station/${stId}")
             }
 
-
-
             post("/$ROUT_SET_QR/{stId}") {
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID,KEY_TEXT)) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
@@ -118,7 +126,7 @@ fun Application.configureWebApiRouting() {
 
                     call.respondRedirect("$ROUT_STATION/${stId}")
                 } catch (e: Exception) {
-                    AppLogger.error(TAG, "An error occurred", e)
+                    AppLogger.error("An error occurred", e)
                     call.respondRedirect("$ROUT_STATION/${stId}")
                 }
             }
@@ -164,7 +172,7 @@ fun Application.configureWebApiRouting() {
 
             get("/$ROUT_STATIONLIST") {
                 try {
-                    AppLogger.info(TAG, "/$ROUT_STATIONLIST : ${call.request.queryParameters}")
+                    AppLogger.info("/$ROUT_STATIONLIST : ${call.request.queryParameters}")
                     // Получаем параметры `page` и `pageSize` из запроса
                     val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
                     val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 20
@@ -221,7 +229,7 @@ fun Application.configureWebApiRouting() {
 
                     call.respond(HttpStatusCode.OK, responseJson.toString())
                 } catch (e: Exception) {
-                    AppLogger.error(TAG, "An error occurred", e)
+                    AppLogger.error("An error occurred", e)
                     call.respond(HttpStatusCode.InternalServerError, "An error occurred: ${e.printStackTrace()}",)
                 }
             }
@@ -278,7 +286,7 @@ fun Application.configureWebApiRouting() {
                     }
                     call.respond(HttpStatusCode.OK, fStationJson.toString())
                 } catch (e: Exception) {
-                    AppLogger.error(TAG, "An error occurred", e)
+                    AppLogger.error("An error occurred", e)
                 }
             }
 
@@ -306,7 +314,7 @@ fun Application.configureWebApiRouting() {
 
                     call.respond(HttpStatusCode.OK, """{"status": "Bank status updated to ${currentBank.status.name}."}""")
                 } catch (e: Exception) {
-                    AppLogger.error(TAG, "An error occurred while updating bank status", e)
+                    AppLogger.error("An error occurred while updating bank status", e)
                     call.respondText("An error occurred while processing your request.", status = HttpStatusCode.InternalServerError)
                 }
             }
@@ -408,28 +416,7 @@ fun Application.configureWebApiRouting() {
 
             }
 
-            post("/$ROUT_UPLOADLOGS") {
-                val stId = call.request.queryParameters.get(KEY_STATION_ID)
-                val multipart = call.receiveMultipart()
-                multipart.forEachPart { part ->
-                    if (part is PartData.FileItem) {
-                        val fileBytes = part.provider.invoke().readRemaining().readByteArray()
-                        val uploadDir = File("${PATH_LOGFILES}/${stId}")
-                        if (!uploadDir.exists()) {
-                            uploadDir.mkdirs() // создаем директорию, если она не существует
-                        }
-                        val zipFile = File(uploadDir, part.originalFileName ?: "uploaded-archive.zip")
-                        zipFile.writeBytes(fileBytes)
-                        extractZip(zipFile, uploadDir)
-                        part.dispose()
-                    }
-                }
-                // Вызываем колбек, если он существует
-                uploadLogsCallbacks[stId]?.complete(Unit)
-                uploadLogsCallbacks.remove(stId)
 
-                call.respondText("Archive uploaded and extracted successfully")
-            }
         }
     }
 }

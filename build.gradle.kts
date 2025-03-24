@@ -44,6 +44,8 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":ylogger"))
+
     implementation(libs.ktor.server.html.builder)
     implementation(libs.ktor.server.auth)
     implementation(libs.ktor.server.auth.jwt)

@@ -7,21 +7,26 @@ import com.yellastrodev.CommandsManager.waitForEventOrTimeout
 import com.yellastrodev.CommandsManager.waitMap
 import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.databases.database
-import com.yellastrodev.yLogger.AppLogger
 import com.yellastrodev.ymtserial.*
+import com.yellastrodev.ymtserial.ylogger.AppLogger
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.*
+import io.ktor.server.plugins.swagger.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.cio.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.io.readByteArray
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 val MAX_EVENTS_SIZE = 100
 
@@ -50,11 +55,6 @@ fun Application.configureStationRouting() {
 
     val TAG = "StationApi"
 
-
-
-
-
-
     fun createCommanJson(fComand: JSONObject): JSONObject {
         val fKey = fComand.keys().next()
         return JSONObject(mapOf(
@@ -64,16 +64,21 @@ fun Application.configureStationRouting() {
     }
 
     routing {
+        route("/stationApi") {
+            swaggerUI(path = "swagger", swaggerFile = "openapi/stationApi.yaml")
+            }
         authenticate("auth-apk-static") {
             route("/stationApi") {
+//                swaggerUI(path = "swagger", swaggerFile = "openapi/webApi.yaml")
+
                 get("/$ROUT_CHECKIN") {
                     var stId: String? = null
                     try {
 
-                        AppLogger.debug(TAG, "Checkin ${call.request.rawQueryParameters}")
+                        AppLogger.debug("Checkin ${call.request.rawQueryParameters}")
                         stId = call.request.queryParameters[KEY_STATION_ID]
                         if (waitMap.containsKey(stId)) {
-                            AppLogger.debug(TAG, "get/$ROUT_CHECKIN drop existing $stId future")
+                            AppLogger.debug( "get/$ROUT_CHECKIN drop existing $stId future")
                             cleanLongPool(stId)
                         }
                         val size = call.request.queryParameters[KEY_SIZE]?.toInt()
@@ -83,12 +88,12 @@ fun Application.configureStationRouting() {
                         val events = call.request.queryParameters[KEY_EVENT]
                         val versionName = call.request.queryParameters[PACKAGE_VERSION]
 
-                        AppLogger.info(TAG, "timeout header: $timeoutHeader")
+                        AppLogger.info("timeout header: $timeoutHeader")
 
                         if (stId != null && timeoutHeader != null) {
                             resetStationTimer(stId)
                             val timestamp = (System.currentTimeMillis() / 1000).toInt()
-//                            AppLogger.info(TAG, "Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
+//                            AppLogger.info("Checkin $stId size: $size state: $state timeout: $timeoutHeader traffic: $trafficLastDay events: $events")
 
                             var isUpdated = false
                             val fStation = try {
@@ -100,7 +105,7 @@ fun Application.configureStationRouting() {
                                     )
                                 }
                             } catch (e: Exception) {
-                                AppLogger.error(TAG, "Error on $stId", e)
+                                AppLogger.error("Error on $stId", e)
                                 call.response.status(HttpStatusCode.InternalServerError)
                                 return@get
                             }
@@ -133,7 +138,7 @@ fun Application.configureStationRouting() {
 
                             events?.let {
                                 // тут чекаем как эвенты меняют стейт станции.
-                                AppLogger.info(TAG,"find events: $events")
+                                AppLogger.info("find events: $events")
 
                                 // упорядочиваем к самым новым
                                 val fEventsSort = JSONArray(it).sortedBy {
@@ -180,7 +185,7 @@ fun Application.configureStationRouting() {
                                 // если стейт слотов в базе не совпадает с новым, то обновляем
                                 if (fStation.state.toString() != stateJSON.toString()) {
                                     fStation.state = stateJSON
-                                    AppLogger.info(TAG,"найдены эвенты обновления стейта слотов!")
+                                    AppLogger.info("найдены эвенты обновления стейта слотов!")
                                     isUpdated = true
                                 }
 
@@ -211,7 +216,7 @@ fun Application.configureStationRouting() {
                                 try {
                                     database.updateStation(fStation)
                                 } catch (e: Exception) {
-                                    AppLogger.error(TAG, "Error on UPDATE $stId\n" +
+                                    AppLogger.error("Error on UPDATE $stId\n" +
                                             "on /stationApi/$ROUT_CHECKIN", e)
                                     call.response.status(HttpStatusCode.InternalServerError)
                                     return@get
@@ -234,20 +239,64 @@ fun Application.configureStationRouting() {
                                 response.put(KEY_ONLINE_STATE, onlineState)
                             }
 
-                            AppLogger.info(TAG,"send responce to $stId: $response")
+                            AppLogger.info("send responce to $stId: $response")
                             call.respond(HttpStatusCode.OK, response.toString())
 
 
                         } else {
-                            AppLogger.warn(TAG,"Missing or invalid query parameters")
+                            AppLogger.warn("Missing or invalid query parameters")
                             call.respond(HttpStatusCode.BadRequest, "Missing or invalid query parameters")
                         }
 
                     } catch (e: Exception) {
-                        AppLogger.error(TAG, "An error occurred", e)
+                        AppLogger.error("An error occurred", e)
                     } finally {
                         stId?.let { runStationDisconnectTimer(stId) }
                     }
+                }
+
+                post("/$ROUT_UPLOADLOGS") {
+                    val stId = call.request.queryParameters.get(KEY_STATION_ID)
+                    val multipart = call.receiveMultipart()
+                    multipart.forEachPart { part ->
+                        if (part is PartData.FileItem) {
+                            val fileBytes = part.provider.invoke().readRemaining().readByteArray()
+                            val uploadDir = File("${PATH_LOGFILES}/${stId}")
+                            if (!uploadDir.exists()) {
+                                uploadDir.mkdirs() // создаем директорию, если она не существует
+                            }
+                            val zipFile = File(uploadDir, part.originalFileName ?: "uploaded-archive.zip")
+                            zipFile.writeBytes(fileBytes)
+                            extractZip(zipFile, uploadDir)
+                            part.dispose()
+                        }
+                    }
+                    // Вызываем колбек, если он существует
+                    uploadLogsCallbacks[stId]?.complete(Unit)
+                    uploadLogsCallbacks.remove(stId)
+
+                    call.respondText("Archive uploaded and extracted successfully")
+                }
+
+                get("/$ROUT_DOWNLOAD") {
+                    AppLogger.info("api/$ROUT_DOWNLOAD")
+                    try {
+                        val params = extractParametersOrFail(call, listOf(KEY_PATH)) { errorMessage ->
+                            call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
+                        } ?: return@get
+                        val filePath = params[KEY_PATH]!!
+                        AppLogger.info("download path: $filePath")
+                        val file = File(filePath)
+                        if (file.exists()) {
+                            call.respondFile(file)
+                        } else {
+                            call.respond(HttpStatusCode.NotFound, "Файл не найден")
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.error("api/$ROUT_DOWNLOAD", e)
+                        call.respond(HttpStatusCode.InternalServerError, "Внутренняя ошибка сервера: \n${e.message}")
+                    }
+
                 }
 
                 get("/delayed-response") {

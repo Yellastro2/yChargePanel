@@ -1,0 +1,181 @@
+openapi: 3.0.3
+info:
+  title: Station API
+  description: API для связи станциями (Check-in лонгупл, загрузка логов, скачивание файлов).
+  version: 1.0.0
+
+paths:
+  /stationApi/checkin:
+    get:
+      summary: Check-in станции
+      description: |
+        Эндпоинт используется для периодической регистрации станции на сервере. Станция отправляет информацию о своем состоянии, событиях и других параметрах, а сервер возвращает команды или подтверждение ("pong"). Сервер удерживает запрос в режиме long polling до появления команды или истечения таймаута, указанного в заголовке `X-Timeout`.
+      parameters:
+        - name: station_id
+          in: query
+          required: true
+          description: Уникальный идентификатор станции
+          schema:
+            type: string
+            example: "station123"
+        - name: size
+          in: query
+          required: false
+          description: Количество слотов в станции. Отправляется только после внештатного разрыва соединения.
+          schema:
+            type: integer
+            example: 12
+        - name: state
+          in: query
+          required: false
+          description: Текущее состояние станции (JSON-строка, представляющая объект с состоянием слотов или других данных)
+          schema:
+            type: string
+            example: '{"slotState": {"1": {"type": "bank", "id": "123"}}}'
+        - name: X-Timeout
+          in: header
+          required: true
+          description: Таймаут ожидания в секундах. Сервер удерживает запрос до появления команды или истечения этого времени (минус 5 секунд на пинг). Минимальное значение — 10 секунд означает восстановление после офлайна.
+          schema:
+            type: integer
+            example: 15
+        - name: traffic
+          in: query
+          required: false
+          description: Трафик за последние сутки (JSON-строка, представляющая объект с данными о трафике). Отправляется станией раз в час.
+          schema:
+            type: string
+            example: '{"upload": 100, "download": 200}'
+        - name: events
+          in: query
+          required: false
+          description: События на станции (JSON-массив объектов, содержащих тип события, дату и другие данные)
+          schema:
+            type: string
+            example: '[{"type": "add_bank", "slot_id": "1", "date": 1699999999}, {"type": "remove_bank", "slot_id": "2", "date": 1700000000}]'
+        - name: package_version
+          in: query
+          required: false
+          description: Версия программного обеспечения станции. Отправляется только после внештатного разрыва соединения.
+          schema:
+            type: string
+            example: "1.0.0"
+      security:
+        - bearerAuth: [ ]
+      responses:
+        '200':
+          description: Успешный ответ с командой или подтверждением
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - command
+                  - code
+                properties:
+                  command:
+                    type: string
+                    description: Команда для станции (например, "pong" или другая)
+                  code:
+                    type: integer
+                    description: Код ответа (например, 200 для успеха)
+                  params:
+                    type: object
+                    description: Дополнительные параметры команды (если есть)
+                    additionalProperties: true
+                  online_state:
+                    type: object
+                    description: Состояния при восстановлении после офлайна
+                    additionalProperties: true
+              examples:
+                pong:
+                  summary: Подтверждение "pong" без команд
+                  value:
+                    command: "pong"
+                    code: 200
+                command:
+                  summary: Ответ с командой для станции
+                  value:
+                    command: "update_software"
+                    code: 200
+                    params:
+                      url: "http://example.com/update.zip"
+                online_state:
+                  summary: Ответ с состояниями при восстановлении
+                  value:
+                    command: "pong"
+                    code: 200
+                    online_state:
+                      change_wallpaper: "http://example.com/wallpaper.jpg"
+                      change_qr: "http://example.com/qr.png"
+        '400':
+          description: Неверные или отсутствующие параметры запроса
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Missing or invalid query parameters"
+        '500':
+          description: Внутренняя ошибка сервера (например, проблемы с базой данных)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Internal server error"
+
+  /stationApi/uploadLogs:
+    post:
+      summary: Загрузка логов
+      description: Загружает архив с логами станции и распаковывает его.
+      parameters:
+        - name: {KEY_STATION_ID}
+          in: query
+          required: true
+          description: Уникальный идентификатор станции
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Архив успешно загружен и распакован
+        '400':
+          description: Ошибка в запросе
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /stationApi/download:
+    get:
+      summary: Скачивание файла
+      description: Скачивает файл по указанному пути.
+      parameters:
+        - name: {KEY_PATH}
+          in: query
+          required: true
+          description: Путь к файлу на сервере
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Файл успешно найден и загружен
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Ошибка в запросе
+        '404':
+          description: Файл не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+
