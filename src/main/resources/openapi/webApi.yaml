@@ -287,25 +287,3 @@ paths:
         200:
           description: Успешное выполнение команды
 
-  /webApi/api/{stId}/uploadlogs:
-    post:
-      summary: Загрузка архивов логов для станции
-      parameters:
-        - name: stId
-          in: query
-          required: true
-          description: Идентификатор станции
-          schema:
-            type: string
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-      responses:
-        200:
-          description: Успешный ответ о загрузке

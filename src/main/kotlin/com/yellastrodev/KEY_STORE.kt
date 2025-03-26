@@ -61,6 +61,7 @@ val ROUT_SET_QR = "setQR"
 val ROUT_UPLOAD_FILE_FORSTATION = "upload"
 val WALLPAPER_ROUT = "wallpaper"
 val APK_ROUT = "apk"
+val WEBZIP_ROUT = "webzip"
 
 val ROUT_DOWNLOAD = "download"
 val ROUT_RELEASE = "release"
@@ -74,6 +75,7 @@ val ROUT_DISABLE_STATION = "disableStation"
 val PATH_BASE = "uploads"
 val PATH_WALLPAPERS = "${PATH_BASE}/wallpapers"
 val PATH_APK = "${PATH_BASE}/apks"
+val PATH_WEBZIP = "${PATH_BASE}/webzips"
 
 val CMD_RELEASE = "release"
 val CMD_FORCE = "force"
@@ -82,6 +84,8 @@ val CMD_CHANGE_WALLPAPER = "wallpaper"
 val CMD_CHANGE_QR = "QR_data"
 val CMD_REBOOT = "reboot"
 val CMD_UPDATE_APK = "update_apk"
+const val CMD_CHANGE_WEBVIEW = "webview"
+
 
 val CMD_CANCEL = "cancel" // внутренняя команда сервера о перезапуске соединения клиентом
 

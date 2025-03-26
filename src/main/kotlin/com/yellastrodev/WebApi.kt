@@ -4,6 +4,7 @@ import com.yellastrodev.CommandsManager.isClientConnected
 import com.yellastrodev.CommandsManager.sendCommandToStation
 import com.yellastrodev.CommandsManager.setWallpaper
 import com.yellastrodev.CommandsManager.updateAPK
+import com.yellastrodev.CommandsManager.updateWebview
 import com.yellastrodev.databases.entities.Station
 import com.yellastrodev.databases.database
 import com.yellastrodev.databases.entities.Powerbank
@@ -58,6 +59,7 @@ fun Application.configureWebApiRouting() {
         route("/webApi") {
 
             post("/$ROUT_UPLOAD_FILE_FORSTATION/{fileType}/{$KEY_STATION_ID}") {
+
                 val params = extractParametersOrFail(call, listOf(KEY_STATION_ID, "fileType")) { errorMessage ->
                     call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
                 } ?: return@post
@@ -65,10 +67,13 @@ fun Application.configureWebApiRouting() {
                 val stId = params[KEY_STATION_ID]!!
                 val fileType = params["fileType"]!!
 
+                AppLogger.info("post /$ROUT_UPLOAD_FILE_FORSTATION/${fileType}/{$stId}")
+
                 // Определение папки для сохранения файла в зависимости от fileType
                 val (uploadDir, fFileType) = when (fileType) {
                     WALLPAPER_ROUT -> File(PATH_WALLPAPERS) to "jpg"  // для обоев
                     APK_ROUT -> File(PATH_APK) to "apk"               // для APK
+                    WEBZIP_ROUT -> File(PATH_WEBZIP) to "zip"
                     else -> {
                         call.respondText("Invalid file type", status = HttpStatusCode.BadRequest)
                         return@post
@@ -99,6 +104,8 @@ fun Application.configureWebApiRouting() {
                     setWallpaper(stId, newFileName)
                 } else if (fileType == APK_ROUT) {
                     updateAPK(stId, newFileName)
+                } else if (fileType == WEBZIP_ROUT){
+                    updateWebview(stId, newFileName)
                 }
 
                 call.respondRedirect("/station/${stId}")

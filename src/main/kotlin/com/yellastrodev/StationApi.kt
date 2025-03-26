@@ -54,6 +54,7 @@ suspend fun addEventToStation(stId: String, eventJson: JSONObject) {
 fun Application.configureStationRouting() {
 
     val TAG = "StationApi"
+    val routPath = "stationApi"
 
     fun createCommanJson(fComand: JSONObject): JSONObject {
         val fKey = fComand.keys().next()
@@ -64,11 +65,11 @@ fun Application.configureStationRouting() {
     }
 
     routing {
-        route("/stationApi") {
+        route("/$routPath") {
             swaggerUI(path = "swagger", swaggerFile = "openapi/stationApi.yaml")
             }
         authenticate("auth-apk-static") {
-            route("/stationApi") {
+            route("/$routPath") {
 //                swaggerUI(path = "swagger", swaggerFile = "openapi/webApi.yaml")
 
                 get("/$ROUT_CHECKIN") {
@@ -279,7 +280,7 @@ fun Application.configureStationRouting() {
                 }
 
                 get("/$ROUT_DOWNLOAD") {
-                    AppLogger.info("api/$ROUT_DOWNLOAD")
+                    AppLogger.info("$routPath/$ROUT_DOWNLOAD")
                     try {
                         val params = extractParametersOrFail(call, listOf(KEY_PATH)) { errorMessage ->
                             call.respondText(errorMessage, status = HttpStatusCode.BadRequest)
@@ -293,7 +294,7 @@ fun Application.configureStationRouting() {
                             call.respond(HttpStatusCode.NotFound, "Файл не найден")
                         }
                     } catch (e: Exception) {
-                        AppLogger.error("api/$ROUT_DOWNLOAD", e)
+                        AppLogger.error("$routPath/$ROUT_DOWNLOAD", e)
                         call.respond(HttpStatusCode.InternalServerError, "Внутренняя ошибка сервера: \n${e.message}")
                     }
 

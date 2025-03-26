@@ -27,19 +27,23 @@
                                         <div id="station_name" class="station_name"></div>
 
 
-                                        <form id="uploadImageForm" action="/api/upload/wallpaper/${stId}" method="post" enctype="multipart/form-data">
+                                        <form id="uploadImageForm" action="/webApi/upload/wallpaper/${stId}" method="post" enctype="multipart/form-data">
                                             <input type="file" name="image" accept="image/*" required>
                                             <button type="submit">Загрузить картинку</button>
                                         </form>
-                                        <form id="uploadApkForm" class="yForm" action="/api/upload/apk/${stId}" method="post" enctype="multipart/form-data">
+                                        <form id="uploadApkForm" class="yForm" action="/webApi/upload/apk/${stId}" method="post" enctype="multipart/form-data">
                                             <input type="file" name="image" accept=".apk" required>
                                             <button type="submit">Загрузить APK</button>
                                         </form>
 
-                                        <form id="changeQR" action="/api/setQR" method="post">
+                                        <form id="changeQR" action="/webApi/setQR" method="post">
                                             <label for="textInput">Поменять QR:</label>
                                             <input type="text" id="textInput" name="text" required>
                                             <button type="submit">Отправить</button>
+                                        </form>
+                                        <form id="uploadWebZip" class="yForm" action="/webApi/upload/webzip/${stId}" method="post" enctype="multipart/form-data">
+                                            <input type="file" name="image" accept=".zip" required>
+                                            <button type="submit">Загрузить web.zip</button>
                                         </form>
                                     </div>
 

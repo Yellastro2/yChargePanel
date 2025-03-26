@@ -31,7 +31,7 @@ function formatTimestamp(timestamp) {
 document.addEventListener('DOMContentLoaded', function() {
     const currentHost = window.location.origin;
     const stId = getLastSegment(window.location.href); // Получение stId из URL
-    const apiUrl = `${currentHost}/api/stationInfo?stId=${stId}`;
+    const apiUrl = `${currentHost}/webApi/stationInfo?stId=${stId}`;
 
     function fetchData() {
         if (isFocused)
@@ -61,13 +61,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const getLogButton = document.getElementById('stations_log_button');
         getLogButton.onclick = () => getLogs(currentHost, stId);
         const formImg = document.getElementById('uploadImageForm');
-        formImg.action = `/api/upload/wallpaper/${stId}`;
+        formImg.action = `/webApi/upload/wallpaper/${stId}`;
 
         const formApk = document.getElementById('uploadApkForm');
-        formApk.action = `/api/upload/apk/${stId}`;
+        formApk.action = `/webApi/upload/apk/${stId}`;
 
         const qrForm = document.getElementById('changeQR');
-        qrForm.action = `/api/setQR/${stId}`;
+        qrForm.action = `/webApi/setQR/${stId}`;
+
+        const webzipForm = document.getElementById('uploadWebZip');
+        webzipForm.action = `/webApi/upload/webzip/${stId}`;
 
         document.getElementById('btn_reboot').onclick = () => rebootStation(currentHost, stId);
         const btnDisableStation = document.getElementById('btn_disable')
@@ -195,7 +198,7 @@ function getLastSegment(url) {
 }
 
 function getLogs(currentHost, stId) {
-    const apiUrl = `${currentHost}/api/getLogs?stId=${stId}`;
+    const apiUrl = `${currentHost}/webApi/getLogs?stId=${stId}`;
     fetch(apiUrl)
         .then(response => {
             if (!response.ok) {
@@ -228,33 +231,33 @@ function baseRequest(apiUrl) {
 }
 
 function forceSlot(currentHost, stId, num) {
-    const apiUrl = `${currentHost}/api/force?stId=${stId}&num=${num}`;
+    const apiUrl = `${currentHost}/webApi/force?stId=${stId}&num=${num}`;
     baseRequest(apiUrl)
 }
 
 
 function releaseSlot(currentHost, stId, num) {
-    const apiUrl = `${currentHost}/api/release?stId=${stId}&num=${num}`;
+    const apiUrl = `${currentHost}/webApi/release?stId=${stId}&num=${num}`;
     baseRequest(apiUrl)
 }
 
 function blockSlot(currentHost, stId, num) {
-    const apiUrl = `${currentHost}/api/block_slot?stId=${stId}&num=${num}`;
+    const apiUrl = `${currentHost}/webApi/block_slot?stId=${stId}&num=${num}`;
     baseRequest(apiUrl)
 }
 
 function blockBank(currentHost, bankId) {
-    const apiUrl = `${currentHost}/api/updateBankStatus?bankId=${bankId}`;
+    const apiUrl = `${currentHost}/webApi/updateBankStatus?bankId=${bankId}`;
     baseRequest(apiUrl)
 }
 
 function disableStation(currentHost, stId) {
-    const apiUrl = `${currentHost}/api/disableStation?stId=${stId}`;
+    const apiUrl = `${currentHost}/webApi/disableStation?stId=${stId}`;
     baseRequest(apiUrl)
 }
 
 function rebootStation(currentHost, stId) {
-    const apiUrl = `${currentHost}/api/reboot?stId=${stId}`;
+    const apiUrl = `${currentHost}/webApi/reboot?stId=${stId}`;
     baseRequest(apiUrl)
 }
 

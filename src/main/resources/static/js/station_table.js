@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function loadStations(page, filter = '') {
     const currentHost = window.location.origin;
-    const apiUrl = `${currentHost}/api/stationList?page=${page}&pageSize=${pageSize}&filter=${filter}`;
+    const apiUrl = `${currentHost}/webApi/stationList?page=${page}&pageSize=${pageSize}&filter=${filter}`;
 
     currentFilter = filter
     fetch(apiUrl)
@@ -118,7 +118,7 @@ function loadStations(page, filter = '') {
             // Добавление изображения
             if (station.wallpaper) {
                 const img = document.createElement('img');
-                img.src = `/api/download?path=uploads/wallpapers/${station.wallpaper}`;
+                img.src = `/stationApi/download?path=uploads/wallpapers/${station.wallpaper}`;
                 img.alt = 'Wallpaper';
                 img.style.width = '50px'; // Пример размера
                 img.style.height = '50px'; // Пример размера
@@ -212,7 +212,7 @@ function changePage(page) {
 
 
 function getLogs(currentHost, stId) {
-    const apiUrl = `${currentHost}/api/getLogs?stId=${stId}`;
+    const apiUrl = `${currentHost}/webApi/getLogs?stId=${stId}`;
     fetch(apiUrl)
         .then(response => response.json())
         .then(data => {

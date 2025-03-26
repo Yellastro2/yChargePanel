@@ -24,9 +24,14 @@ object CommandsManager {
 
     val waitMap: ConcurrentHashMap<String, CompletableFuture<JSONObject?>> = ConcurrentHashMap()
 
+
+    /**
+     * поменять значение обоев в базе данных + отправить команду станции о смене обоев.
+     * если даже команда не дойдет (мб офлайн), станция всёравно заметит через обновление онайн стейта
+     * что id обоев стали разными локально и в базе
+     */
     fun setWallpaper(stId: String, newFileName: String) {
-        // поменять значение обоев в базе данных + отправить команду станции о смене обоев.
-        // если даже команда не дойдет (мб офлайн), станция всёравно замет что id обоев стали разными локально и в базе
+
 
         try {
             val fStation = database.getStationById(stId)!!
@@ -45,6 +50,14 @@ object CommandsManager {
             sendCommandToStation(stId,JSONObject(mapOf(CMD_UPDATE_APK to newFileName)))
         } catch (e: Exception) {
             AppLogger.error("Error updateAPK: ${e.message}", e)
+        }
+    }
+
+    fun updateWebview(stId: String, newFileName: String) {
+        try {
+            sendCommandToStation(stId,JSONObject(mapOf(CMD_CHANGE_WEBVIEW to newFileName)))
+        } catch (e: Exception) {
+            AppLogger.error("Error update webview: ${e.message}", e)
         }
     }
 
