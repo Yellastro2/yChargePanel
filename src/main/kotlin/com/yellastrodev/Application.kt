@@ -7,9 +7,11 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.websocket.*
 import io.netty.channel.ChannelOption
 import java.io.File
 import java.io.FileNotFoundException
+import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>) {
     AppLogger.init( File("panelLogFiles"),1024 * 1024 * 5)
@@ -17,6 +19,12 @@ fun main(args: Array<String>) {
 
     val port = 8080
     val server = embeddedServer(Netty, port = port) {
+        install(WebSockets) {
+            pingPeriod = 15.seconds
+            timeout = 60.seconds
+            maxFrameSize = Long.MAX_VALUE
+            masking = false
+        }
         install(CORS) {
             anyHost()
             allowHeader(HttpHeaders.ContentType)

@@ -1,6 +1,8 @@
 package com.yellastrodev
 
+import com.yellastrodev.CommandsManager.activeClients
 import com.yellastrodev.CommandsManager.cleanLongPool
+import com.yellastrodev.CommandsManager.commandFlow
 import com.yellastrodev.CommandsManager.resetStationTimer
 import com.yellastrodev.CommandsManager.runStationDisconnectTimer
 import com.yellastrodev.CommandsManager.waitForEventOrTimeout
@@ -18,15 +20,17 @@ import io.ktor.server.plugins.swagger.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import io.ktor.websocket.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.io.readByteArray
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import kotlin.time.Duration
 
 val MAX_EVENTS_SIZE = 100
 
@@ -65,12 +69,90 @@ fun Application.configureStationRouting() {
     }
 
     routing {
+
+
         route("/$routPath") {
             swaggerUI(path = "swagger", swaggerFile = "openapi/stationApi.yaml")
             }
         authenticate("auth-apk-static") {
+
+
+
             route("/$routPath") {
-//                swaggerUI(path = "swagger", swaggerFile = "openapi/webApi.yaml")
+                webSocket("/ws") {
+                    AppLogger.debug("WebSocket connection established")
+                    val stId = call.request.queryParameters[KEY_STATION_ID] ?: run {
+                        AppLogger.debug("WebSocket connection отмена, не указан $KEY_STATION_ID")
+                        close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Missing $KEY_STATION_ID"))
+                        return@webSocket
+                    }
+
+                    val size = call.request.queryParameters[KEY_SIZE]?.toInt()
+                    var state = call.request.queryParameters[KEY_STATE]?.let {
+                        JSONObject(it)
+                    }?: run {null}
+                    val packageVersion = call.request.queryParameters[PACKAGE_VERSION]
+
+                    ClientEventManager.onClientEvent(
+                        stId,
+                        size = size,
+                        state = state,
+                        versionName = packageVersion)
+
+                    // Канал для таймера
+                    val timeoutChannel = Channel<Unit>(capacity = 1)
+
+                    // Пинг каждые 55 секунд
+                    val pingJob = launch {
+                        while (isActive) {
+                            delay(55 * 1000L)
+                            send(Frame.Ping("ping".toByteArray()))
+                            timeoutChannel.trySend(Unit) // Отправляем сигнал для таймера
+                        }
+                    }
+
+                    // Подписываемся на поток команд
+                    val commandJob = launch {
+                        commandFlow.collect { (targetId, command) ->
+                            if (targetId == stId) {
+                                val fCommand = createCommanJson(command)
+                                send(Frame.Text(fCommand.toString()))
+                            }
+                        }
+                    }.also { activeClients[stId] = it }
+
+                    try {
+                        for (frame in incoming) {
+                            AppLogger.info("WebSocket Получен фрейм $stId")
+                            when (frame) {
+                                is Frame.Text -> {
+                                    val receivedText = frame.readText()
+                                    val json = JSONObject(receivedText)
+
+                                    ClientEventManager.onClientEvent(
+                                        stId,
+                                        json.optJSONObject(KEY_STATE, null),
+                                        if (json.has(KEY_SIZE)) json.getInt(KEY_SIZE) else null,
+                                        json.optString(PACKAGE_VERSION, null),
+                                        json.optString(KEY_TRAFFIC_LAST_DAY, null),
+                                        json.optJSONObject(KEY_EVENT, null)
+                                    )
+                                    timeoutChannel.trySend(Unit) // Сбрасываем таймер, если пришёл pong
+                                }
+                                is Frame.Ping ->  send(Frame.Pong(ByteArray(0)))
+                                is Frame.Pong -> send(Frame.Ping(ByteArray(0)))
+                                else -> AppLogger.error("WebSocket Получен неподдерживаемый тип фрейма $stId")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.error("WebSocket error for $stId", e)
+                    } finally {
+                        pingJob.cancel()
+                        commandJob.cancel()
+                        activeClients[stId]?.cancel()
+                        activeClients.remove(stId)
+                    }
+                }
 
                 get("/$ROUT_CHECKIN") {
                     var stId: String? = null
@@ -257,6 +339,7 @@ fun Application.configureStationRouting() {
                 }
 
                 post("/$ROUT_UPLOADLOGS") {
+                    AppLogger.info("$routPath/$ROUT_UPLOADLOGS")
                     val stId = call.request.queryParameters.get(KEY_STATION_ID)
                     val multipart = call.receiveMultipart()
                     multipart.forEachPart { part ->

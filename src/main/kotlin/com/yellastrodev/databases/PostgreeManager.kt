@@ -149,6 +149,7 @@ class PostgreeManager: DbManager {
                     serializeStation(it, station)
                 }
             }
+            AppLogger.debug("станция ${station.stId} обновлена в базе")
         }
     }
 

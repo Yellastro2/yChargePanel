@@ -7,6 +7,7 @@ import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.future.await
@@ -22,7 +23,12 @@ object CommandsManager {
 
     val DISCONNECT_TIMEOUT = 10 * 1000L
 
+    val commandPoolMap = HashMap<String, ArrayList<JSONObject>>()
     val waitMap: ConcurrentHashMap<String, CompletableFuture<JSONObject?>> = ConcurrentHashMap()
+
+    val activeClients = ConcurrentHashMap<String, Job>()
+    val commandFlow = MutableSharedFlow<Pair<String, JSONObject>>(extraBufferCapacity = 100)
+
 
 
     /**
@@ -30,7 +36,7 @@ object CommandsManager {
      * если даже команда не дойдет (мб офлайн), станция всёравно заметит через обновление онайн стейта
      * что id обоев стали разными локально и в базе
      */
-    fun setWallpaper(stId: String, newFileName: String) {
+    suspend fun setWallpaper(stId: String, newFileName: String) {
 
 
         try {
@@ -45,7 +51,7 @@ object CommandsManager {
         }
     }
 
-    fun updateAPK(stId: String, newFileName: String) {
+    suspend fun updateAPK(stId: String, newFileName: String) {
         try {
             sendCommandToStation(stId,JSONObject(mapOf(CMD_UPDATE_APK to newFileName)))
         } catch (e: Exception) {
@@ -53,7 +59,7 @@ object CommandsManager {
         }
     }
 
-    fun updateWebview(stId: String, newFileName: String) {
+    suspend fun updateWebview(stId: String, newFileName: String) {
         try {
             sendCommandToStation(stId,JSONObject(mapOf(CMD_CHANGE_WEBVIEW to newFileName)))
         } catch (e: Exception) {
@@ -93,22 +99,25 @@ object CommandsManager {
         }
     }
 
-    val commandPoolMap = HashMap<String, ArrayList<JSONObject>>()
 
-    fun sendCommandToStation(stId: String, commandJSON: JSONObject) {
-        if (waitMap.containsKey(stId))
-            waitMap[stId]?.complete(commandJSON)
-        else {
-            commandPoolMap[stId] ?: kotlin.run {
-                commandPoolMap[stId] = java.util.ArrayList()
-            }
-            commandPoolMap[stId]!!.add(commandJSON)
-        }
+    suspend fun sendCommandToStation(stId: String, command: JSONObject) {
+        commandFlow.emit(stId to command)
     }
+
+//    fun sendCommandToStation(stId: String, commandJSON: JSONObject) {
+//        if (waitMap.containsKey(stId))
+//            waitMap[stId]?.complete(commandJSON)
+//        else {
+//            commandPoolMap[stId] ?: kotlin.run {
+//                commandPoolMap[stId] = java.util.ArrayList()
+//            }
+//            commandPoolMap[stId]!!.add(commandJSON)
+//        }
+//    }
 
 
     fun isClientConnected(stId: String): Boolean {
-        return waitMap.containsKey(stId)
+        return activeClients[stId]?.isActive == true
     }
 
     val stationTimers = ConcurrentHashMap<String, Job>()
